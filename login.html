@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIGILAST - ログイン</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--navy:#1B2A4A;--accent:#2E75B6;--gold:#D4A843;--mint:#27AE60;--red:#E74C3C;--light:#F0F4FA;--bg:#F8FAFC;--white:#FFF;--text:#333;--muted:#888;--border:#E2E8F0}
+body{font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center}
+
+.container{width:100%;max-width:440px;padding:20px}
+.logo{text-align:center;margin-bottom:32px}
+.logo h1{font-size:32px;font-weight:800;color:var(--navy)}
+.logo h1 span{color:var(--gold)}
+.logo p{font-size:13px;color:var(--muted);margin-top:4px}
+
+.card{background:var(--white);border-radius:16px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.card h2{font-size:18px;color:var(--navy);margin-bottom:4px}
+.card .sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+
+.tabs{display:flex;gap:0;margin-bottom:24px;background:var(--light);border-radius:10px;padding:4px}
+.tab-btn{flex:1;padding:10px;text-align:center;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:8px;border:none;background:none;font-family:inherit;transition:.2s}
+.tab-btn.active{background:var(--white);color:var(--navy);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--navy);margin-bottom:6px}
+.form-group input{width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;transition:.2s}
+.form-group input:focus{border-color:var(--accent);outline:none}
+
+.btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),#4a9ad4);color:var(--white);border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:.2s;margin-top:8px}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(46,117,182,.3)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+.btn-free{width:100%;padding:14px;background:var(--white);color:var(--accent);border:2px solid var(--accent);border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:.2s;margin-top:10px}
+.btn-free:hover{background:var(--light)}
+
+.divider{text-align:center;font-size:12px;color:var(--muted);margin:16px 0;position:relative}
+.divider::before,.divider::after{content:'';position:absolute;top:50%;width:40%;height:1px;background:var(--border)}
+.divider::before{left:0}.divider::after{right:0}
+
+.error-msg{background:#FFF0F0;color:var(--red);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none}
+.success-msg{background:#E8F5E9;color:var(--mint);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none}
+
+.footer{text-align:center;margin-top:20px;font-size:12px;color:var(--muted)}
+.footer a{color:var(--accent);text-decoration:none}
+
+.free-badge{display:inline-block;background:#E8F5E9;color:var(--mint);font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;margin-left:6px}
+
+.features{margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+.features p{font-size:12px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.features p svg{width:14px;height:14px;stroke:var(--mint);stroke-width:2.5;fill:none;flex-shrink:0}
+
+.loading{display:none;text-align:center;padding:20px}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="logo">
+    <h1>DIGI<span>LAST</span></h1>
+    <p>あなたのデジタル終活ボックス</p>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('login')">ログイン</button>
+      <button class="tab-btn" onclick="switchTab('signup')">新規登録 <span class="free-badge">無料</span></button>
+    </div>
+
+    <div id="error" class="error-msg"></div>
+    <div id="success" class="success-msg"></div>
+
+    <!-- ログインフォーム -->
+    <div id="form-login">
+      <div class="form-group">
+        <label>メールアドレス</label>
+        <input type="email" id="login-email" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label>パスワード</label>
+        <input type="password" id="login-password" placeholder="パスワード">
+      </div>
+      <button class="btn-primary" id="btn-login" onclick="handleLogin()">ログイン</button>
+    </div>
+
+    <!-- 新規登録フォーム -->
+    <div id="form-signup" style="display:none">
+      <div class="form-group">
+        <label>表示名</label>
+        <input type="text" id="signup-name" placeholder="ニックネーム">
+      </div>
+      <div class="form-group">
+        <label>メールアドレス</label>
+        <input type="email" id="signup-email" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label>パスワード（8文字以上）</label>
+        <input type="password" id="signup-password" placeholder="安全なパスワード">
+      </div>
+      <button class="btn-primary" id="btn-signup" onclick="handleSignup()">無料でアカウント作成</button>
+
+      <div class="features">
+        <p><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>1ファイルまで無料でお試し</p>
+        <p><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>AES-256-GCM ゼロ知識暗号化</p>
+        <p><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>クレジットカード不要</p>
+      </div>
+    </div>
+
+    <!-- ローディング -->
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p style="font-size:13px;color:var(--muted)">処理中...</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <a href="index.html">← トップページに戻る</a>
+  </div>
+</div>
+
+<script>
+// ===== Supabase初期化 =====
+const SUPABASE_URL = 'https://ejvaxazkfymntwnkkfym.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqdmF4YXprZnltbnR3bmtrZnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTU2OTAsImV4cCI6MjA5MjAzMTY5MH0.fEBrMLSBHCW4ax8Q8N1dmNPwTDSBHWnISXkRU74FpII';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// 既にログイン済みならリダイレクト
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) window.location.href = 'app.html';
+})();
+
+// ===== タブ切り替え =====
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  event.target.closest('.tab-btn').classList.add('active');
+  document.getElementById('form-login').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('form-signup').style.display = tab === 'signup' ? 'block' : 'none';
+  hideMessages();
+}
+
+// ===== メッセージ表示 =====
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('success').style.display = 'none';
+}
+function showSuccess(msg) {
+  const el = document.getElementById('success');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('error').style.display = 'none';
+}
+function hideMessages() {
+  document.getElementById('error').style.display = 'none';
+  document.getElementById('success').style.display = 'none';
+}
+
+function setLoading(show) {
+  document.getElementById('loading').style.display = show ? 'block' : 'none';
+  document.getElementById('form-login').style.display = show ? 'none' : (document.querySelector('.tab-btn.active').textContent.includes('ログイン') ? 'block' : 'none');
+  document.getElementById('form-signup').style.display = show ? 'none' : (document.querySelector('.tab-btn.active').textContent.includes('新規') ? 'block' : 'none');
+}
+
+// ===== ログイン =====
+async function handleLogin() {
+  hideMessages();
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+
+  if (!email || !password) { showError('メールアドレスとパスワードを入力してください'); return; }
+
+  setLoading(true);
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  setLoading(false);
+
+  if (error) {
+    showError('ログインに失敗しました。メールアドレスとパスワードを確認してください。');
+    return;
+  }
+
+  window.location.href = 'app.html';
+}
+
+// ===== 新規登録 =====
+async function handleSignup() {
+  hideMessages();
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+
+  if (!email || !password) { showError('メールアドレスとパスワードを入力してください'); return; }
+  if (password.length < 8) { showError('パスワードは8文字以上にしてください'); return; }
+
+  setLoading(true);
+  const { data, error } = await sb.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { display_name: name || email.split('@')[0] }
+    }
+  });
+  setLoading(false);
+
+  if (error) {
+    showError('登録に失敗しました: ' + error.message);
+    return;
+  }
+
+  if (data.user && !data.session) {
+    showSuccess('確認メールを送信しました。メール内のリンクをクリックしてアカウントを有効化してください。');
+  } else if (data.session) {
+    window.location.href = 'app.html';
+  }
+}
+
+// Enterキー対応
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const loginVisible = document.getElementById('form-login').style.display !== 'none';
+    if (loginVisible) handleLogin();
+    else handleSignup();
+  }
+});
+</script>
+</body>
+</html>
