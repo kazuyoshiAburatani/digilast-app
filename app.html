@@ -1,0 +1,2279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1B2A4A">
+<title>DIGILAST - デジタル遺品管理</title>
+<!-- v2.3 - 2026-04-18 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --navy: #1B2A4A;
+  --accent: #2E75B6;
+  --gold: #D4A843;
+  --mint: #27AE60;
+  --red: #E74C3C;
+  --light: #F0F4FA;
+  --bg: #F8FAFC;
+  --sidebar-w: 260px;
+  --topbar-h: 56px;
+  --radius: 10px;
+  --shadow: 0 2px 12px rgba(27,42,74,.08);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { overflow-x: hidden; width: 100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Segoe UI", Meiryo, sans-serif; background: var(--bg); color: #333; min-height: 100vh; overflow-x: hidden; width: 100%; }
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0;
+  width: var(--sidebar-w); background: var(--navy);
+  display: flex; flex-direction: column; z-index: 1000;
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+  transform: translateX(-100%);
+}
+.sidebar.open {
+  transform: translateX(0);
+}
+.sidebar-logo {
+  height: var(--topbar-h); display: flex; align-items: center;
+  padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.sidebar-logo span { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: 2px; white-space: nowrap; overflow: hidden; }
+.sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+.nav-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 18px; color: rgba(255,255,255,.7); cursor: pointer;
+  text-decoration: none; transition: all .15s; white-space: nowrap; font-size: 14px;
+}
+.nav-item:hover { background: rgba(255,255,255,.08); color: #fff; }
+.nav-item.active { background: rgba(46,117,182,.35); color: #fff; }
+.nav-item svg { flex-shrink: 0; width: 20px; height: 20px; }
+.nav-item span { overflow: hidden; }
+.nav-divider { height: 1px; background: rgba(255,255,255,.12); margin: 6px 18px; }
+
+/* ===== SIDEBAR OVERLAY ===== */
+.sidebar-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  z-index: 999; opacity: 0; visibility: hidden;
+  transition: opacity .3s ease, visibility .3s ease;
+}
+.sidebar-overlay.open {
+  opacity: 1; visibility: visible;
+}
+
+/* ===== TOPBAR ===== */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--topbar-h); background: #fff; border-bottom: 1px solid #e2e8f0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; z-index: 90; overflow: hidden; max-width: 100%;
+}
+.topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topbar-left h2 { font-size: 16px; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hamburger-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border: none; border-radius: 8px;
+  background: var(--navy); cursor: pointer; flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.hamburger-btn svg { width: 24px; height: 24px; }
+.topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.btn-checkin {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 18px; border: none; border-radius: 6px;
+  background: var(--mint); color: #fff; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+}
+.btn-checkin:hover { background: #219a52; }
+.btn-checkin:disabled { background: #aaa; cursor: not-allowed; }
+.btn-checkin svg { width: 16px; height: 16px; }
+.user-pill {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border-radius: 20px; background: var(--light);
+  font-size: 13px; color: var(--navy);
+}
+.user-pill .avatar {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 12px; font-weight: 700;
+}
+
+/* ===== MAIN CONTENT ===== */
+.main {
+  margin-left: 0; margin-top: var(--topbar-h);
+  padding: 20px 16px; min-height: calc(100vh - var(--topbar-h));
+  overflow-x: hidden; max-width: 100%; box-sizing: border-box;
+}
+.page { display: none; }
+.page.active { display: block; }
+
+/* ===== LOADING ===== */
+.spinner {
+  display: inline-block; width: 32px; height: 32px;
+  border: 3px solid var(--light); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner-sm { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,.3); border-top-color: rgba(255,255,255,.8); border-radius: 50%; animation: spin .7s linear infinite; }
+.thumb-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.page-loader { display: flex; justify-content: center; align-items: center; padding: 80px 0; }
+
+/* ===== DASHBOARD ===== */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card {
+  background: #fff; border-radius: var(--radius); padding: 20px;
+  box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px;
+}
+.stat-card .label { font-size: 12px; color: #888; font-weight: 500; }
+.stat-card .value { font-size: 28px; font-weight: 700; color: var(--navy); }
+.stat-card .sub { font-size: 12px; color: #999; }
+.stat-card.checkin .value { color: var(--mint); }
+.stat-card.checkin.warning .value { color: var(--gold); }
+.stat-card.checkin.danger .value { color: var(--red); }
+
+.storage-section { background: #fff; border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 24px; }
+.storage-section h3 { font-size: 14px; color: var(--navy); margin-bottom: 12px; }
+.storage-bar-wrap { background: #e2e8f0; border-radius: 6px; height: 12px; overflow: hidden; }
+.storage-bar { height: 100%; border-radius: 6px; background: var(--accent); transition: width .5s ease; }
+.storage-bar.warn { background: var(--gold); }
+.storage-bar.danger { background: var(--red); }
+.storage-info { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #888; }
+
+.upgrade-banner {
+  background: linear-gradient(135deg, var(--gold) 0%, #e8b84d 100%);
+  color: #fff; border-radius: var(--radius); padding: 18px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px; cursor: pointer;
+}
+.upgrade-banner h4 { font-size: 15px; }
+.upgrade-banner p { font-size: 12px; opacity: .9; margin-top: 2px; }
+.upgrade-banner button {
+  background: #fff; color: var(--gold); border: none; padding: 8px 20px;
+  border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; font-size: 13px;
+}
+
+.recent-section { background: #fff; border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+.recent-section h3 { font-size: 14px; color: var(--navy); margin-bottom: 16px; }
+.recent-list { list-style: none; }
+.recent-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+.recent-item:last-child { border-bottom: none; }
+.recent-icon { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.recent-icon.photo { background: #dbeafe; color: var(--accent); }
+.recent-icon.video { background: #fce7f3; color: #be185d; }
+.recent-icon.document { background: #d1fae5; color: var(--mint); }
+.recent-meta { flex: 1; }
+.recent-meta .name { color: var(--navy); font-weight: 500; }
+.recent-meta .date { color: #aaa; font-size: 11px; margin-top: 2px; }
+
+/* ===== VAULT ===== */
+.vault-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; max-width: 100%; overflow: hidden; }
+.vault-toolbar .back-btn {
+  display: none; align-items: center; gap: 4px;
+  background: none; border: 1px solid #d0d5dd; border-radius: 6px;
+  padding: 7px 14px; cursor: pointer; font-size: 13px; color: var(--navy);
+}
+.vault-toolbar .back-btn.show { display: flex; }
+.vault-toolbar .dir-title { font-size: 18px; font-weight: 700; color: var(--navy); display: none; }
+.vault-toolbar .dir-title.show { display: block; }
+.vault-toolbar .btn-change-pw {
+  display: none; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border: 1px solid #d0d5dd; border-radius: 6px;
+  background: #fff; cursor: pointer; color: var(--gold);
+}
+.vault-toolbar .btn-change-pw.show { display: flex; }
+.vault-toolbar .btn-change-pw:hover { background: var(--light); }
+.filter-group { display: none; align-items: center; gap: 6px; }
+.filter-group.show { display: flex; }
+.filter-btn {
+  padding: 6px 14px; border: 1px solid #d0d5dd; border-radius: 6px;
+  background: #fff; cursor: pointer; font-size: 12px; color: #555;
+}
+.filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.vault-search {
+  display: none; padding: 7px 12px; border: 1px solid #d0d5dd;
+  border-radius: 6px; font-size: 13px; width: 140px; max-width: 40vw; flex-shrink: 1; min-width: 0;
+}
+.vault-search.show { display: block; }
+.view-toggle { display: none; gap: 4px; }
+.view-toggle.show { display: flex; }
+.view-toggle button {
+  width: 32px; height: 32px; border: 1px solid #d0d5dd; border-radius: 6px;
+  background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.view-toggle button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-upload {
+  display: none; margin-left: auto;
+  padding: 8px 18px; border: none; border-radius: 6px;
+  background: var(--accent); color: #fff; font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: background .2s;
+}
+.btn-upload.show { display: block; }
+.btn-upload:hover { background: #245f96; }
+
+.dir-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.dir-card {
+  background: #fff; border-radius: var(--radius); padding: 20px 16px;
+  box-shadow: var(--shadow); cursor: pointer; text-align: center;
+  transition: transform .15s, box-shadow .15s; border: 2px solid transparent;
+}
+.dir-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(27,42,74,.12); border-color: var(--accent); }
+.dir-card .dir-icon { font-size: 32px; margin-bottom: 8px; }
+.dir-card .dir-lock { color: var(--gold); margin-bottom: 6px; }
+.dir-card .dir-lock svg { width: 20px; height: 20px; }
+.dir-card .dir-name { font-size: 14px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+.dir-card .dir-count { font-size: 11px; color: #999; }
+.dir-delete-btn {
+  position: absolute; top: 8px; right: 8px; width: 28px; height: 28px;
+  border-radius: 50%; border: none; background: rgba(0,0,0,.06);
+  color: #bbb; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all .2s; opacity: 0;
+}
+.dir-card:hover .dir-delete-btn { opacity: 1; }
+.dir-delete-btn:hover { background: rgba(231,76,60,.1); color: var(--red); }
+@media (hover: none) { .dir-delete-btn { opacity: 1; } }
+.dir-card-add {
+  background: #fff; border-radius: var(--radius); padding: 20px 16px;
+  box-shadow: var(--shadow); cursor: pointer; text-align: center;
+  transition: transform .15s, box-shadow .15s; border: 2px dashed #d0d5dd;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 140px;
+}
+.dir-card-add:hover { transform: translateY(-2px); border-color: var(--accent); }
+.dir-card-add .add-icon { width: 48px; height: 48px; border-radius: 50%; background: var(--light);
+  display: flex; align-items: center; justify-content: center; }
+.dir-card-add .add-icon svg { width: 24px; height: 24px; stroke: var(--accent); }
+.dir-card-add span { font-size: 12px; color: #999; }
+
+.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.file-grid.list-view { grid-template-columns: 1fr; }
+.file-card {
+  background: #fff; border-radius: var(--radius); overflow: hidden;
+  box-shadow: var(--shadow); cursor: pointer; transition: transform .15s;
+}
+.file-card:hover { transform: translateY(-2px); }
+.file-thumb {
+  width: 100%; aspect-ratio: 1; display: flex; align-items: center;
+  justify-content: center; position: relative; overflow: hidden;
+}
+.file-thumb.photo { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.file-thumb.video { background: linear-gradient(135deg, #0c3547 0%, #1b6b93 100%); }
+.file-thumb.document { background: var(--light); }
+.file-thumb .play-overlay {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,.85); display: flex; align-items: center; justify-content: center;
+}
+.file-thumb .doc-icon { color: var(--accent); }
+.file-thumb .doc-icon svg { width: 48px; height: 48px; }
+.file-info { padding: 10px 12px; }
+.file-info .fname { font-size: 12px; font-weight: 500; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-info .fmeta { font-size: 11px; color: #aaa; margin-top: 2px; }
+
+.file-grid.list-view .file-card {
+  display: flex; align-items: center;
+}
+.file-grid.list-view .file-thumb { width: 48px; height: 48px; aspect-ratio: auto; flex-shrink: 0; border-radius: 6px; }
+.file-grid.list-view .file-info { flex: 1; }
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2000; opacity: 0; visibility: hidden; transition: all .2s;
+}
+.modal-overlay.open { opacity: 1; visibility: visible; }
+.modal {
+  background: #fff; border-radius: 14px; padding: 32px;
+  width: 90%; max-width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  transform: translateY(20px); transition: transform .2s;
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal h3 { font-size: 18px; color: var(--navy); margin-bottom: 8px; }
+.modal p { font-size: 13px; color: #888; margin-bottom: 20px; line-height: 1.5; }
+.modal input[type="password"], .modal input[type="text"], .modal input[type="email"], .modal input[type="tel"] {
+  width: 100%; padding: 10px 14px; border: 1px solid #d0d5dd; border-radius: 8px;
+  font-size: 14px; margin-bottom: 16px; outline: none;
+}
+.modal input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(46,117,182,.12); }
+.modal .btn-primary {
+  width: 100%; padding: 11px; border: none; border-radius: 8px;
+  background: var(--accent); color: #fff; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: background .2s;
+}
+.modal .btn-primary:hover { background: #245f96; }
+.modal .btn-cancel {
+  width: 100%; padding: 10px; border: none; background: none;
+  color: #888; font-size: 13px; cursor: pointer; margin-top: 8px;
+}
+.modal .error-msg { color: var(--red); font-size: 12px; margin-bottom: 12px; display: none; }
+
+/* ===== FILE VIEWER ===== */
+.file-viewer {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,.95); z-index: 3000;
+  display: none; flex-direction: column;
+  overflow: hidden;
+}
+.file-viewer.open { display: flex; }
+.fv-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; color: #fff; flex-shrink: 0; gap: 8px;
+}
+.fv-topbar .fv-info { flex: 1; min-width: 0; }
+.fv-topbar .fv-name { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fv-topbar .fv-meta { font-size: 11px; opacity: .6; margin-top: 2px; }
+.fv-topbar-btns { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.fv-topbar-btns button {
+  padding: 6px 10px; border: 1px solid rgba(255,255,255,.3); border-radius: 6px;
+  background: none; color: #fff; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px;
+  white-space: nowrap;
+}
+.fv-topbar-btns button:hover { background: rgba(255,255,255,.1); }
+.fv-topbar-btns .btn-delete { border-color: var(--red); color: var(--red); }
+.fv-topbar-btns .btn-delete:hover { background: rgba(231,76,60,.15); }
+.fv-topbar-btns .fv-close-btn {
+  border: none; background: rgba(255,255,255,.15); width: 36px; height: 36px;
+  border-radius: 50%; font-size: 20px; padding: 0; display: flex; align-items: center; justify-content: center;
+}
+.fv-body {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  position: relative; padding: 8px 48px; overflow: hidden;
+}
+.fv-body .fv-content {
+  max-width: 100%; max-height: calc(100vh - 80px); border-radius: 8px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.fv-body .fv-content img,
+.fv-body .fv-content video {
+  max-width: 100%; max-height: calc(100vh - 100px); object-fit: contain; border-radius: 8px;
+}
+.fv-body .fv-content .placeholder-img {
+  width: 100%; max-width: 400px; height: 60vh; border-radius: 8px;
+}
+.fv-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px; border-radius: 50%; border: none;
+  background: rgba(255,255,255,.15); color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; transition: background .2s; z-index: 10;
+}
+.fv-nav:hover { background: rgba(255,255,255,.3); }
+.fv-nav.prev { left: 6px; }
+.fv-nav.next { right: 6px; }
+
+/* ===== TRIGGER SETTINGS ===== */
+.trigger-card { background: #fff; border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 20px; }
+.trigger-card h3 { font-size: 15px; color: var(--navy); margin-bottom: 16px; }
+.trigger-status { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.status-badge {
+  padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;
+}
+.status-badge.active { background: #d1fae5; color: var(--mint); }
+.status-badge.warning { background: #fef3c7; color: #b45309; }
+.status-badge.danger { background: #fee2e2; color: var(--red); }
+.trigger-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.trigger-dates .td-item { }
+.trigger-dates .td-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+.trigger-dates .td-value { font-size: 15px; font-weight: 600; color: var(--navy); }
+
+.timeline { display: flex; align-items: flex-start; gap: 0; margin: 20px 0; position: relative; }
+.timeline::before {
+  content: ''; position: absolute; top: 16px; left: 24px; right: 24px;
+  height: 3px; background: #e2e8f0;
+}
+.tl-step {
+  flex: 1; text-align: center; position: relative; z-index: 1;
+}
+.tl-dot {
+  width: 32px; height: 32px; border-radius: 50%; background: #e2e8f0;
+  margin: 0 auto 8px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #888;
+}
+.tl-step.done .tl-dot { background: var(--mint); color: #fff; }
+.tl-step.current .tl-dot { background: var(--accent); color: #fff; box-shadow: 0 0 0 4px rgba(46,117,182,.2); }
+.tl-step.danger .tl-dot { background: var(--red); color: #fff; }
+.tl-label { font-size: 11px; color: #888; }
+.tl-day { font-size: 12px; font-weight: 600; color: var(--navy); margin-bottom: 2px; }
+
+.emergency-form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; color: #888; font-weight: 500; }
+.form-group input, .form-group select {
+  padding: 10px 12px; border: 1px solid #d0d5dd; border-radius: 8px;
+  font-size: 14px; outline: none;
+}
+.form-group input:focus { border-color: var(--accent); }
+.form-group input[readonly] { background: var(--light); color: #888; }
+.btn-save {
+  padding: 10px 24px; border: none; border-radius: 8px;
+  background: var(--accent); color: #fff; font-size: 13px;
+  font-weight: 600; cursor: pointer; margin-top: 16px;
+}
+.btn-save:hover { background: #245f96; }
+
+/* ===== SETTINGS ===== */
+.settings-card { background: #fff; border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 20px; }
+.settings-card h3 { font-size: 15px; color: var(--navy); margin-bottom: 16px; }
+.plan-badge {
+  display: inline-block; padding: 4px 14px; border-radius: 12px;
+  font-size: 12px; font-weight: 700;
+}
+.plan-badge.free { background: #e2e8f0; color: #64748b; }
+.plan-badge.paid { background: #dbeafe; color: var(--accent); }
+.settings-actions { display: flex; gap: 10px; margin-top: 16px; }
+.btn-outline {
+  padding: 9px 20px; border: 1px solid #d0d5dd; border-radius: 8px;
+  background: #fff; font-size: 13px; cursor: pointer; color: var(--navy);
+}
+.btn-outline:hover { background: var(--light); }
+.btn-danger {
+  padding: 9px 20px; border: none; border-radius: 8px;
+  background: var(--red); color: #fff; font-size: 13px; cursor: pointer;
+}
+.btn-danger:hover { background: #c0392b; }
+
+/* ===== UPGRADE ===== */
+.upgrade-hero {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--accent) 100%);
+  border-radius: var(--radius); padding: 36px; color: #fff;
+  text-align: center; margin-bottom: 28px;
+}
+.upgrade-hero h2 { font-size: 24px; margin-bottom: 8px; }
+.upgrade-hero p { opacity: .85; font-size: 14px; margin-bottom: 20px; }
+.upgrade-hero .price { font-size: 36px; font-weight: 800; }
+.upgrade-hero .price-sub { font-size: 13px; opacity: .7; }
+.upgrade-hero button {
+  margin-top: 20px; padding: 12px 36px; border: none; border-radius: 8px;
+  background: var(--gold); color: #fff; font-size: 15px; font-weight: 700;
+  cursor: pointer;
+}
+.upgrade-hero button:hover { background: #c49a3a; }
+.plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.plan-card {
+  background: #fff; border-radius: var(--radius); padding: 24px;
+  box-shadow: var(--shadow); text-align: center; border: 2px solid transparent;
+  transition: border-color .2s;
+}
+.plan-card.current { border-color: var(--accent); }
+.plan-card h4 { font-size: 16px; color: var(--navy); margin-bottom: 4px; }
+.plan-card .plan-size { font-size: 28px; font-weight: 800; color: var(--accent); margin-bottom: 4px; }
+.plan-card .plan-price { font-size: 13px; color: #888; margin-bottom: 16px; }
+.plan-card button {
+  padding: 9px 24px; border: none; border-radius: 8px;
+  background: var(--accent); color: #fff; font-size: 13px;
+  font-weight: 600; cursor: pointer; width: 100%;
+}
+.plan-card button:hover { background: #245f96; }
+.plan-card button:disabled { background: #ccc; cursor: not-allowed; }
+
+/* ===== HELP ===== */
+.faq-list { margin-bottom: 24px; }
+.faq-item { background: #fff; border-radius: var(--radius); margin-bottom: 8px; box-shadow: var(--shadow); overflow: hidden; }
+.faq-q {
+  padding: 16px 20px; cursor: pointer; display: flex; align-items: center;
+  justify-content: space-between; font-size: 14px; font-weight: 600; color: var(--navy);
+}
+.faq-q .arrow { transition: transform .2s; color: #aaa; }
+.faq-item.open .faq-q .arrow { transform: rotate(180deg); }
+.faq-a { padding: 0 20px; max-height: 0; overflow: hidden; transition: all .25s; font-size: 13px; color: #666; line-height: 1.7; }
+.faq-item.open .faq-a { max-height: 300px; padding: 0 20px 16px; }
+
+.contact-card { background: #fff; border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
+.contact-card h3 { font-size: 15px; color: var(--navy); margin-bottom: 10px; }
+.contact-card a { color: var(--accent); text-decoration: none; }
+
+.homescreen-card { background: #fff; border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-top: 20px; }
+.homescreen-card h3 { font-size: 15px; color: var(--navy); margin-bottom: 10px; }
+.homescreen-card p { font-size: 13px; color: #666; line-height: 1.7; margin-bottom: 6px; }
+.homescreen-card ol { font-size: 13px; color: #666; line-height: 1.8; padding-left: 20px; }
+
+/* ===== SUCCESS ANIMATION ===== */
+.checkin-toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-80px);
+  background: var(--mint); color: #fff; padding: 12px 28px; border-radius: 8px;
+  font-size: 14px; font-weight: 600; z-index: 4000; transition: transform .4s ease;
+  box-shadow: 0 6px 20px rgba(39,174,96,.3);
+}
+.checkin-toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .emergency-form { grid-template-columns: 1fr; }
+  .trigger-dates { grid-template-columns: 1fr; }
+  .timeline { flex-wrap: wrap; gap: 8px; }
+  .timeline::before { display: none; }
+  .dir-grid { grid-template-columns: 1fr 1fr; }
+  .file-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo"><span>DIGILAST</span></div>
+  <nav class="sidebar-nav">
+    <a class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+      <svg viewBox="0 0 24 24" stroke="#fff" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>ホーム</span>
+    </a>
+    <a class="nav-item" data-page="vault" onclick="navigate('vault')">
+      <svg viewBox="0 0 24 24" stroke="#fff" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span>金庫</span>
+    </a>
+    <div class="nav-divider"></div>
+    <a class="nav-item" data-page="trigger" onclick="navigate('trigger')">
+      <svg viewBox="0 0 24 24" stroke="#fff" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>発動状態</span>
+    </a>
+    <a class="nav-item" data-page="settings" onclick="navigate('settings')">
+      <svg viewBox="0 0 24 24" stroke="#fff" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>設定</span>
+    </a>
+    <div class="nav-divider"></div>
+    <a class="nav-item" data-page="upgrade" onclick="navigate('upgrade')">
+      <svg viewBox="0 0 24 24" stroke="#fff" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      <span>容量アップ</span>
+    </a>
+    <a class="nav-item" data-page="help" onclick="navigate('help')">
+      <svg viewBox="0 0 24 24" stroke="#fff" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>ヘルプ</span>
+    </a>
+    <div style="margin-top:auto;padding:16px 20px;font-size:10px;color:rgba(255,255,255,.3);text-align:center;">v2.3</div>
+  </nav>
+</aside>
+
+<!-- TOPBAR -->
+<header class="topbar" id="topbar">
+  <div class="topbar-left">
+    <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="メニュー">
+      <svg viewBox="0 0 24 24" stroke="#fff" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <span style="font-size:9px;color:#bbb;background:#f0f4fa;padding:2px 6px;border-radius:4px;flex-shrink:0;">v2.3</span>
+    <h2 id="pageTitle">ホーム</h2>
+  </div>
+  <div class="topbar-right">
+    <button class="btn-checkin" id="btnCheckin" onclick="performCheckin()">
+      <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      チェックイン
+    </button>
+    <div class="user-pill" id="userPill">
+      <div class="avatar" id="userAvatar">U</div>
+      <span id="userName">ユーザー</span>
+    </div>
+  </div>
+</header>
+
+<!-- CHECKIN TOAST -->
+<div class="checkin-toast" id="checkinToast">チェックイン完了しました</div>
+
+<!-- PASSWORD MODAL (unlock existing folder) -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal">
+    <h3 id="pwModalTitle">暗号化パスワード</h3>
+    <p id="pwModalDesc">このフォルダを開くには暗号化パスワードを入力してください。パスワードはサーバーには送信されません。</p>
+    <div class="error-msg" id="pwError">パスワードを入力してください</div>
+    <input type="password" id="pwInput" placeholder="パスワードを入力">
+    <button class="btn-primary" onclick="unlockDirectory()">ロック解除</button>
+    <button class="btn-cancel" onclick="closePasswordModal()">キャンセル</button>
+  </div>
+</div>
+
+<!-- PASSWORD SETUP MODAL (first time for new folder) -->
+<div class="modal-overlay" id="passwordSetupModal">
+  <div class="modal">
+    <h3 id="pwSetupTitle">パスワード設定</h3>
+    <p id="pwSetupDesc">このフォルダの暗号化パスワードを設定してください。フォルダごとに異なるパスワードを使用できます。</p>
+    <div class="error-msg" id="pwSetupError">エラー</div>
+    <input type="password" id="pwSetupInput" placeholder="パスワードを入力">
+    <input type="password" id="pwSetupConfirm" placeholder="パスワードを再入力（確認）">
+    <button class="btn-primary" onclick="setupDirectoryPassword()">パスワードを設定</button>
+    <button class="btn-cancel" onclick="closePasswordSetupModal()">キャンセル</button>
+  </div>
+</div>
+
+<!-- PASSWORD CHANGE MODAL -->
+<div class="modal-overlay" id="passwordChangeModal">
+  <div class="modal">
+    <h3 id="pwChangeTitle">パスワード変更</h3>
+    <p>現在のパスワードと新しいパスワードを入力してください。</p>
+    <div class="error-msg" id="pwChangeError">エラー</div>
+    <input type="password" id="pwChangeOld" placeholder="現在のパスワード">
+    <input type="password" id="pwChangeNew" placeholder="新しいパスワード">
+    <input type="password" id="pwChangeConfirm" placeholder="新しいパスワード（確認）">
+    <button class="btn-primary" onclick="changeDirectoryPassword()">パスワードを変更</button>
+    <button class="btn-cancel" onclick="closePasswordChangeModal()">キャンセル</button>
+  </div>
+</div>
+
+<!-- UPGRADE PROMPT MODAL -->
+<div class="modal-overlay" id="upgradeModal">
+  <div class="modal">
+    <h3>アップグレードが必要です</h3>
+    <p>無料プランでは合計1ファイルまで保管できます。2ファイル以上を保管するにはアップグレードしてください。</p>
+    <button class="btn-primary" onclick="closeUpgradeModal(); navigate('upgrade');">アップグレードページへ</button>
+    <button class="btn-cancel" onclick="closeUpgradeModal()">閉じる</button>
+  </div>
+</div>
+
+<!-- ADD FOLDER MODAL -->
+<div class="modal-overlay" id="addFolderModal">
+  <div class="modal">
+    <h3>新しいフォルダを追加</h3>
+    <p>フォルダ名を入力してください。フォルダごとに個別のパスワードを設定できます。</p>
+    <div class="error-msg" id="addFolderError">エラー</div>
+    <input type="text" id="addFolderName" placeholder="フォルダ名（例: 家族, 仕事）">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;" id="iconPicker">
+      <span style="font-size:12px;color:#888;width:100%;margin-bottom:4px;">アイコンを選択:</span>
+    </div>
+    <button class="btn-primary" onclick="createNewFolder()">追加する</button>
+    <button class="btn-cancel" onclick="closeAddFolderModal()">キャンセル</button>
+  </div>
+</div>
+
+<!-- FILE VIEWER -->
+<div class="file-viewer" id="fileViewer">
+  <div class="fv-topbar">
+    <div class="fv-info">
+      <div class="fv-name" id="fvName"></div>
+      <div class="fv-meta" id="fvMeta"></div>
+    </div>
+    <div class="fv-topbar-btns">
+      <button onclick="downloadFile()">
+        <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        保存
+      </button>
+      <button class="btn-delete" onclick="deleteFile()">
+        <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        削除
+      </button>
+      <button class="fv-close-btn" onclick="closeFileViewer()">&times;</button>
+    </div>
+  </div>
+  <div class="fv-body">
+    <button class="fv-nav prev" onclick="viewerNav(-1)">&#8249;</button>
+    <div class="fv-content" id="fvContent"></div>
+    <button class="fv-nav next" onclick="viewerNav(1)">&#8250;</button>
+  </div>
+</div>
+
+<!-- ===== PAGES ===== -->
+<main class="main" id="mainContent">
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-loader" id="dashLoader"><div class="spinner"></div></div>
+    <div id="dashContent" style="display:none;">
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="storage-section" id="storageSection"></div>
+      <div id="upgradeBanner"></div>
+      <div class="recent-section">
+        <h3>最近のアクティビティ</h3>
+        <ul class="recent-list" id="recentList"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- VAULT -->
+  <div class="page" id="page-vault">
+    <div class="vault-toolbar" id="vaultToolbar">
+      <button class="back-btn" id="vaultBack" onclick="backToDirectories()">
+        <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        戻る
+      </button>
+      <span class="dir-title" id="vaultDirTitle"></span>
+      <button class="btn-change-pw" id="btnChangePw" onclick="openPasswordChangeModal()" title="フォルダパスワード変更">
+        <svg width="18" height="18" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      </button>
+      <div class="filter-group" id="filterGroup">
+        <button class="filter-btn active" data-filter="all" onclick="filterFiles('all',this)">すべて</button>
+        <button class="filter-btn" data-filter="photo" onclick="filterFiles('photo',this)">写真</button>
+        <button class="filter-btn" data-filter="video" onclick="filterFiles('video',this)">動画</button>
+        <button class="filter-btn" data-filter="document" onclick="filterFiles('document',this)">書類</button>
+      </div>
+      <input class="vault-search" id="vaultSearch" placeholder="ファイル名で検索..." oninput="searchFiles(this.value)">
+      <div class="view-toggle" id="viewToggle">
+        <button class="active" data-view="grid" onclick="setView('grid',this)">
+          <svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        </button>
+        <button data-view="list" onclick="setView('list',this)">
+          <svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        </button>
+      </div>
+      <button class="btn-upload" id="btnUpload" onclick="triggerUpload()">
+        <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        アップロード
+      </button>
+    </div>
+    <div class="page-loader" id="vaultLoader" style="display:none"><div class="spinner"></div></div>
+    <div class="dir-grid" id="dirGrid"></div>
+    <div class="file-grid" id="fileGrid" style="display:none;"></div>
+    <input type="file" id="fileInput" style="display:none" multiple onchange="handleFileSelect(event)">
+  </div>
+
+  <!-- TRIGGER STATUS (display only) -->
+  <div class="page" id="page-trigger">
+    <div class="page-loader" id="triggerLoader"><div class="spinner"></div></div>
+    <div id="triggerContent" style="display:none;">
+      <div class="trigger-card">
+        <h3>発動状態</h3>
+        <div class="trigger-status" id="triggerStatus"></div>
+        <div class="trigger-dates" id="triggerDates"></div>
+        <p style="font-size:13px;color:#888;">チェックイン間隔: <strong>30日</strong></p>
+      </div>
+      <div class="trigger-card">
+        <h3>エスカレーション タイムライン</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:16px;">チェックイン期限を過ぎた場合の自動プロセス</p>
+        <div class="timeline" id="timeline"></div>
+      </div>
+      <p style="font-size:12px;color:#999;text-align:center;margin-top:16px;">緊急連絡先などの設定は「設定」ページで管理できます</p>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="page" id="page-settings">
+    <div class="page-loader" id="settingsLoader"><div class="spinner"></div></div>
+    <div id="settingsContent" style="display:none;">
+      <div class="settings-card">
+        <h3>プロフィール</h3>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>表示名</label>
+          <input type="text" id="settingsName" placeholder="表示名を入力">
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>メールアドレス</label>
+          <input type="email" id="settingsEmail" readonly>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px;color:#888;font-weight:500;">現在のプラン</label><br>
+          <span class="plan-badge" id="settingsPlan">FREE</span>
+        </div>
+        <button class="btn-save" onclick="saveProfile()">保存する</button>
+      </div>
+      <div class="settings-card">
+        <h3>緊急連絡先</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:16px;">発動時に通知を受け取る連絡先を設定します</p>
+        <div class="emergency-form" id="emergencyForm"></div>
+        <button class="btn-save" onclick="saveEmergencyContacts()">保存する</button>
+      </div>
+      <div class="settings-card">
+        <h3>セキュリティ</h3>
+        <div class="settings-actions">
+          <button class="btn-outline" onclick="changePassword()">パスワード変更</button>
+          <button class="btn-danger" onclick="logout()">ログアウト</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPGRADE -->
+  <div class="page" id="page-upgrade">
+    <div class="page-loader" id="upgradeLoader"><div class="spinner"></div></div>
+    <div id="upgradeContent" style="display:none;">
+      <div id="upgradeHero"></div>
+      <h3 style="font-size:16px;color:var(--navy);margin-bottom:16px;">ストレージプラン</h3>
+      <div class="plans-grid" id="plansGrid"></div>
+    </div>
+  </div>
+
+  <!-- HELP -->
+  <div class="page" id="page-help">
+    <div class="faq-list" id="faqList"></div>
+    <div class="contact-card">
+      <h3>お問い合わせ</h3>
+      <p style="font-size:13px;color:#666;margin-bottom:8px;">ご質問やご要望がございましたら、お気軽にご連絡ください。</p>
+      <a href="mailto:support@digilast.jp">support@digilast.jp</a>
+    </div>
+    <div class="contact-card" style="background:var(--light);border:1px solid #d0d5dd;">
+      <h3>アプリ情報</h3>
+      <p style="font-size:13px;color:#666;">バージョン: <strong>v2.3</strong></p>
+      <p style="font-size:12px;color:#999;margin-top:4px;">最終更新: 2026年4月18日</p>
+    </div>
+    <div class="homescreen-card">
+      <h3>ホーム画面に追加（フルスクリーン体験）</h3>
+      <p>DIGILASTをホーム画面に追加すると、ブラウザのアドレスバーが非表示になり、ネイティブアプリのような全画面体験ができます。</p>
+      <p><strong>iPhoneの場合:</strong></p>
+      <ol>
+        <li>Safariでこのページを開きます</li>
+        <li>画面下の共有ボタン（四角に上矢印）をタップ</li>
+        <li>「ホーム画面に追加」をタップ</li>
+        <li>「追加」をタップして完了</li>
+      </ol>
+      <p style="margin-top:10px;"><strong>Androidの場合:</strong></p>
+      <ol>
+        <li>Chromeでこのページを開きます</li>
+        <li>右上のメニュー（3点アイコン）をタップ</li>
+        <li>「ホーム画面に追加」をタップ</li>
+        <li>「追加」をタップして完了</li>
+      </ol>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ===== SUPABASE INIT =====
+const SUPABASE_URL = 'https://ejvaxazkfymntwnkkfym.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqdmF4YXprZnltbnR3bmtrZnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTU2OTAsImV4cCI6MjA5MjAzMTY5MH0.fEBrMLSBHCW4ax8Q8N1dmNPwTDSBHWnISXkRU74FpII';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ===== STATE =====
+let currentUser = null;
+let profile = null;
+let currentDirId = null;
+let currentDirName = '';
+let currentFiles = [];
+let filteredFiles = [];
+let viewerIndex = 0;
+let currentFilter = 'all';
+let currentView = 'grid';
+let checkinData = null;
+let directories = [];
+
+// Per-directory encryption passwords (in-memory only, NEVER persisted)
+// Map of directory_id -> password
+// Cache for decrypted blob URLs: file_id -> objectURL
+const decryptedBlobCache = {};
+const dirPasswords = {};
+
+const PAGE_TITLES = {
+  dashboard: 'ホーム',
+  vault: '金庫',
+  trigger: '発動状態',
+  settings: '設定',
+  upgrade: '容量アップ',
+  help: 'ヘルプ'
+};
+
+// ===== AUTH CHECK =====
+(async function init() {
+  try {
+    const { data: { session }, error } = await sb.auth.getSession();
+    if (error || !session) {
+      window.location.href = 'login.html';
+      return;
+    }
+    currentUser = session.user;
+    await loadProfile();
+    updateUserUI();
+    loadDashboard();
+    loadHelp();
+
+    // Handle payment return
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    if (paymentStatus === 'success') {
+      // Reload profile to get updated plan
+      await loadProfile();
+      updateUserUI();
+      setTimeout(() => {
+        alert('お支払いが完了しました！フルプランがアンロックされました。');
+        navigateTo('upgrade');
+      }, 500);
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (paymentStatus === 'cancel') {
+      setTimeout(() => {
+        alert('決済がキャンセルされました。');
+        navigateTo('upgrade');
+      }, 500);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  } catch (e) {
+    console.error('Init error:', e);
+    window.location.href = 'login.html';
+  }
+})();
+
+// ===== PROFILE =====
+async function loadProfile() {
+  try {
+    const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+    if (error) throw error;
+    profile = data;
+  } catch (e) {
+    console.error('Profile load error:', e);
+    profile = { plan: 'free', storage_limit: 104857600, storage_used: 0, display_name: '', emergency_email: '', emergency_phone: '' };
+  }
+}
+
+function updateUserUI() {
+  const name = profile.display_name || currentUser.email.split('@')[0];
+  document.getElementById('userName').textContent = name;
+  document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
+}
+
+// ===== SIDEBAR / HAMBURGER =====
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('open');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
+// ===== NAVIGATION =====
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`[data-page="${page}"]`).classList.add('active');
+  document.getElementById('pageTitle').textContent = PAGE_TITLES[page] || '';
+
+  // Reset vault view
+  if (page === 'vault') {
+    if (!currentDirId) {
+      backToDirectories();
+    }
+    loadDirectories();
+  }
+  if (page === 'trigger') loadTrigger();
+  if (page === 'settings') loadSettings();
+  if (page === 'upgrade') loadUpgrade();
+
+  // Close sidebar
+  closeSidebar();
+}
+
+// ===== DASHBOARD =====
+async function loadDashboard() {
+  const loader = document.getElementById('dashLoader');
+  const content = document.getElementById('dashContent');
+  loader.style.display = 'flex';
+  content.style.display = 'none';
+
+  try {
+    const [checkinRes, dirsRes, filesRes] = await Promise.all([
+      sb.from('checkins').select('*').eq('user_id', currentUser.id).order('last_checkin', { ascending: false }).limit(1),
+      sb.from('directories').select('id').eq('user_id', currentUser.id),
+      sb.from('files').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(5)
+    ]);
+
+    checkinData = checkinRes.data?.[0] || null;
+    const dirCount = dirsRes.data?.length || 0;
+    const recentFiles = filesRes.data || [];
+
+    // Count all files
+    const { count: fileCount } = await sb.from('files').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id);
+
+    // Stats
+    const checkinStatus = getCheckinStatus(checkinData);
+    const usedBytes = profile.storage_used || 0;
+    const limitBytes = profile.storage_limit || 104857600;
+    const pct = Math.round((usedBytes / limitBytes) * 100);
+
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat-card checkin ${checkinStatus.cls}">
+        <div class="label">チェックイン</div>
+        <div class="value">${checkinStatus.text}</div>
+        <div class="sub">${checkinStatus.sub}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">フォルダ数</div>
+        <div class="value">${dirCount}</div>
+        <div class="sub">登録済みフォルダ</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">保管ファイル数</div>
+        <div class="value">${fileCount || 0}</div>
+        <div class="sub">${profile.plan === 'free' ? '<span style="color:var(--gold);">無料: 1ファイルまで</span>' : '暗号化済み'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">使用容量</div>
+        <div class="value">${formatBytes(usedBytes)}</div>
+        <div class="sub">${formatBytes(limitBytes)} 中</div>
+      </div>
+    `;
+
+    const barCls = pct > 90 ? 'danger' : pct > 70 ? 'warn' : '';
+    document.getElementById('storageSection').innerHTML = `
+      <h3>ストレージ使用状況</h3>
+      <div class="storage-bar-wrap"><div class="storage-bar ${barCls}" style="width:${pct}%"></div></div>
+      <div class="storage-info"><span>${formatBytes(usedBytes)} 使用中</span><span>${pct}% / ${formatBytes(limitBytes)}</span></div>
+    `;
+
+    if (pct > 70) {
+      document.getElementById('upgradeBanner').innerHTML = `
+        <div class="upgrade-banner" onclick="navigate('upgrade')">
+          <div><h4>ストレージが不足しています</h4><p>容量を追加してより多くのファイルを保管しましょう</p></div>
+          <button>アップグレード</button>
+        </div>`;
+    } else {
+      document.getElementById('upgradeBanner').innerHTML = '';
+    }
+
+    const list = document.getElementById('recentList');
+    if (recentFiles.length === 0) {
+      list.innerHTML = '<li style="padding:16px 0;text-align:center;color:#aaa;font-size:13px;">まだアクティビティはありません</li>';
+    } else {
+      list.innerHTML = recentFiles.map(f => {
+        const typeLabel = f.type === 'photo' ? '写真' : f.type === 'video' ? '動画' : '書類';
+        const iconCls = f.type || 'document';
+        const iconSvg = f.type === 'photo'
+          ? '<svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
+          : f.type === 'video'
+          ? '<svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>'
+          : '<svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+        return `<li class="recent-item">
+          <div class="recent-icon ${iconCls}">${iconSvg}</div>
+          <div class="recent-meta">
+            <div class="name">${escHTML(f.name)}</div>
+            <div class="date">${typeLabel} / ${formatBytes(f.size)} / ${formatDate(f.created_at)}</div>
+          </div>
+        </li>`;
+      }).join('');
+    }
+
+    // Update checkin button state
+    updateCheckinButton();
+  } catch (e) {
+    console.error('Dashboard load error:', e);
+    document.getElementById('statsGrid').innerHTML = '<p style="color:var(--red);font-size:13px;">データの読み込みに失敗しました</p>';
+  } finally {
+    loader.style.display = 'none';
+    content.style.display = 'block';
+  }
+}
+
+function getCheckinStatus(data) {
+  if (!data) return { text: '未設定', sub: 'チェックインを行ってください', cls: '' };
+  const now = new Date();
+  const deadline = new Date(data.next_deadline);
+  const diff = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+  if (diff > 14) return { text: '正常', sub: `残り ${diff} 日`, cls: '' };
+  if (diff > 3) return { text: '注意', sub: `残り ${diff} 日`, cls: 'warning' };
+  if (diff > 0) return { text: '警告', sub: `残り ${diff} 日`, cls: 'danger' };
+  return { text: '期限超過', sub: `${Math.abs(diff)} 日超過`, cls: 'danger' };
+}
+
+function updateCheckinButton() {
+  const btn = document.getElementById('btnCheckin');
+  if (checkinData) {
+    const lastCheckin = new Date(checkinData.last_checkin);
+    const now = new Date();
+    const hoursSince = (now - lastCheckin) / (1000 * 60 * 60);
+    if (hoursSince < 24) {
+      btn.disabled = true;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> チェックイン済`;
+    }
+  }
+}
+
+// ===== CHECKIN =====
+async function performCheckin() {
+  const btn = document.getElementById('btnCheckin');
+  if (btn.disabled) return;
+  btn.disabled = true;
+
+  try {
+    const now = new Date().toISOString();
+    const nextDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    if (checkinData) {
+      const { error } = await sb.from('checkins')
+        .update({ last_checkin: now, next_deadline: nextDeadline, status: 'active' })
+        .eq('id', checkinData.id);
+      if (error) throw error;
+    } else {
+      const { error } = await sb.from('checkins')
+        .insert({ user_id: currentUser.id, last_checkin: now, next_deadline: nextDeadline, status: 'active' });
+      if (error) throw error;
+    }
+
+    checkinData = { ...checkinData, last_checkin: now, next_deadline: nextDeadline, status: 'active' };
+
+    // Show toast
+    const toast = document.getElementById('checkinToast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+
+    btn.innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> チェックイン済`;
+
+    // Refresh dashboard if visible
+    if (document.getElementById('page-dashboard').classList.contains('active')) {
+      loadDashboard();
+    }
+  } catch (e) {
+    console.error('Checkin error:', e);
+    alert('チェックインに失敗しました。もう一度お試しください。');
+    btn.disabled = false;
+  }
+}
+
+// ===== PER-DIRECTORY PASSWORD HELPERS =====
+async function hashPasswordForVerification(password, dirId) {
+  const enc = new TextEncoder();
+  const data = enc.encode(password + ':verify:' + dirId);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function getStoredPasswordHash(dirId) {
+  try {
+    const stored = localStorage.getItem('digilast_dir_pw');
+    if (!stored) return null;
+    const map = JSON.parse(stored);
+    return map[dirId] || null;
+  } catch(e) { return null; }
+}
+
+function setStoredPasswordHash(dirId, hash) {
+  try {
+    const stored = localStorage.getItem('digilast_dir_pw');
+    const map = stored ? JSON.parse(stored) : {};
+    map[dirId] = hash;
+    localStorage.setItem('digilast_dir_pw', JSON.stringify(map));
+  } catch(e) { console.error('localStorage error', e); }
+}
+
+function hasStoredPasswordHash(dirId) {
+  return getStoredPasswordHash(dirId) !== null;
+}
+
+// ===== VAULT =====
+async function loadDirectories() {
+  const loader = document.getElementById('vaultLoader');
+  const grid = document.getElementById('dirGrid');
+  loader.style.display = 'flex';
+  grid.style.display = 'none';
+
+  try {
+    const { data, error } = await sb.from('directories')
+      .select('*, files(count)')
+      .eq('user_id', currentUser.id)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+
+    directories = data || [];
+    renderDirectories();
+  } catch (e) {
+    console.error('Load directories error:', e);
+    grid.innerHTML = '<p style="color:var(--red);font-size:13px;text-align:center;padding:40px;">フォルダの読み込みに失敗しました</p>';
+    grid.style.display = 'grid';
+  } finally {
+    loader.style.display = 'none';
+  }
+}
+
+function renderDirectories() {
+  const grid = document.getElementById('dirGrid');
+  const folderIcons = ['📁', '📂', '🗂️', '📋', '💼', '🏠', '❤️', '🎵'];
+  let html = directories.map((d, i) => {
+    const icon = d.icon || folderIcons[i % folderIcons.length];
+    const count = d.files?.[0]?.count || 0;
+    return `<div class="dir-card" onclick="openDirectory('${d.id}','${escHTML(d.name)}')" style="position:relative;">
+      <button class="dir-delete-btn" onclick="event.stopPropagation();confirmDeleteFolder('${d.id}','${escHTML(d.name)}',${count})" title="フォルダを削除">
+        <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <div class="dir-icon">${icon}</div>
+      <div class="dir-lock">
+        <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div class="dir-name">${escHTML(d.name)}</div>
+      <div class="dir-count">${count} ファイル</div>
+    </div>`;
+  }).join('');
+
+  html += `<div class="dir-card-add" onclick="openAddFolderModal()">
+    <div class="add-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </div>
+    <span>フォルダを追加</span>
+  </div>`;
+
+  grid.innerHTML = html;
+  grid.style.display = 'grid';
+}
+
+// ===== ADD FOLDER =====
+let selectedFolderIcon = '📁';
+const folderIconOptions = ['📁','📂','🗂️','📋','💼','🏠','❤️','🎵','📸','🎬','📄','🔒','🌟','🎯','💡','🔑'];
+
+function openAddFolderModal() {
+  selectedFolderIcon = '📁';
+  document.getElementById('addFolderName').value = '';
+  document.getElementById('addFolderError').style.display = 'none';
+  const picker = document.getElementById('iconPicker');
+  picker.innerHTML = '<span style="font-size:12px;color:#888;width:100%;margin-bottom:4px;">アイコンを選択:</span>' +
+    folderIconOptions.map(ic => `<span onclick="selectFolderIcon(this,'${ic}')" style="font-size:24px;cursor:pointer;padding:6px;border-radius:8px;border:2px solid ${ic==='📁'?'var(--accent)':'transparent'};background:${ic==='📁'?'var(--light)':'transparent'}">${ic}</span>`).join('');
+  document.getElementById('addFolderModal').classList.add('open');
+}
+
+function selectFolderIcon(el, icon) {
+  selectedFolderIcon = icon;
+  el.parentElement.querySelectorAll('span[onclick]').forEach(s => { s.style.border = '2px solid transparent'; s.style.background = 'transparent'; });
+  el.style.border = '2px solid var(--accent)';
+  el.style.background = 'var(--light)';
+}
+
+function closeAddFolderModal() {
+  document.getElementById('addFolderModal').classList.remove('open');
+}
+
+async function createNewFolder() {
+  const name = document.getElementById('addFolderName').value.trim();
+  const errEl = document.getElementById('addFolderError');
+  if (!name) {
+    errEl.textContent = 'フォルダ名を入力してください';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (name.length > 30) {
+    errEl.textContent = 'フォルダ名は30文字以内にしてください';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    const sortOrder = directories.length;
+    const { data, error } = await sb.from('directories').insert({
+      user_id: currentUser.id,
+      name: name,
+      icon: selectedFolderIcon,
+      sort_order: sortOrder
+    }).select().single();
+
+    if (error) throw error;
+    closeAddFolderModal();
+    loadDirectories();
+  } catch (e) {
+    console.error('Create folder error:', e);
+    errEl.textContent = 'フォルダの作成に失敗しました: ' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+async function confirmDeleteFolder(dirId, dirName, fileCount) {
+  if (fileCount > 0) {
+    if (!confirm(`「${dirName}」には ${fileCount} 件のファイルがあります。\nフォルダとすべてのファイルを完全に削除しますか？\n\nこの操作は取り消せません。`)) return;
+  } else {
+    if (!confirm(`「${dirName}」フォルダを削除しますか？`)) return;
+  }
+
+  try {
+    // Delete files in the folder first
+    if (fileCount > 0) {
+      const { data: files } = await sb.from('files').select('id, storage_path').eq('directory_id', dirId);
+      if (files) {
+        const paths = files.map(f => f.storage_path);
+        await sb.storage.from('encrypted-files').remove(paths);
+        await sb.from('files').delete().eq('directory_id', dirId);
+      }
+    }
+    // Delete the folder
+    const { error } = await sb.from('directories').delete().eq('id', dirId);
+    if (error) throw error;
+
+    loadDirectories();
+    loadDashboard();
+  } catch (e) {
+    console.error('Delete folder error:', e);
+    alert('フォルダの削除に失敗しました: ' + e.message);
+  }
+}
+
+function openDirectory(dirId, dirName) {
+  currentDirId = dirId;
+  currentDirName = dirName;
+
+  // Check if this directory already has a password in memory for this session
+  if (dirPasswords[dirId]) {
+    enterDirectory(dirId, dirName);
+    return;
+  }
+
+  // Check if a password hash has been set before (stored in localStorage)
+  if (hasStoredPasswordHash(dirId)) {
+    // Show unlock modal
+    document.getElementById('pwModalTitle').textContent = `「${dirName}」のロック解除`;
+    document.getElementById('pwModalDesc').textContent = 'このフォルダを開くには暗号化パスワードを入力してください。パスワードはサーバーには送信されません。';
+    document.getElementById('passwordModal').classList.add('open');
+    document.getElementById('pwInput').value = '';
+    document.getElementById('pwError').style.display = 'none';
+    setTimeout(() => document.getElementById('pwInput').focus(), 200);
+  } else {
+    // First time: show password setup modal
+    document.getElementById('pwSetupTitle').textContent = `「${dirName}」のパスワード設定`;
+    document.getElementById('pwSetupDesc').textContent = 'このフォルダの暗号化パスワードを設定してください。フォルダごとに異なるパスワードを使用できます。このパスワードは復元できませんので、必ず覚えておいてください。';
+    document.getElementById('passwordSetupModal').classList.add('open');
+    document.getElementById('pwSetupInput').value = '';
+    document.getElementById('pwSetupConfirm').value = '';
+    document.getElementById('pwSetupError').style.display = 'none';
+    setTimeout(() => document.getElementById('pwSetupInput').focus(), 200);
+  }
+}
+
+function closePasswordModal() {
+  document.getElementById('passwordModal').classList.remove('open');
+}
+
+function closePasswordSetupModal() {
+  document.getElementById('passwordSetupModal').classList.remove('open');
+}
+
+function closePasswordChangeModal() {
+  document.getElementById('passwordChangeModal').classList.remove('open');
+}
+
+function openPasswordChangeModal() {
+  document.getElementById('pwChangeTitle').textContent = `「${currentDirName}」のパスワード変更`;
+  document.getElementById('passwordChangeModal').classList.add('open');
+  document.getElementById('pwChangeOld').value = '';
+  document.getElementById('pwChangeNew').value = '';
+  document.getElementById('pwChangeConfirm').value = '';
+  document.getElementById('pwChangeError').style.display = 'none';
+  setTimeout(() => document.getElementById('pwChangeOld').focus(), 200);
+}
+
+async function setupDirectoryPassword() {
+  const pw = document.getElementById('pwSetupInput').value.trim();
+  const confirm = document.getElementById('pwSetupConfirm').value.trim();
+  const errEl = document.getElementById('pwSetupError');
+
+  if (!pw) {
+    errEl.textContent = 'パスワードを入力してください';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (pw.length < 4) {
+    errEl.textContent = 'パスワードは4文字以上で入力してください';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (pw !== confirm) {
+    errEl.textContent = 'パスワードが一致しません';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    // Derive verification hash and store it
+    const hash = await hashPasswordForVerification(pw, currentDirId);
+    setStoredPasswordHash(currentDirId, hash);
+
+    // Store password in memory
+    dirPasswords[currentDirId] = pw;
+
+    closePasswordSetupModal();
+    enterDirectory(currentDirId, currentDirName);
+  } catch (e) {
+    console.error('Password setup error:', e);
+    errEl.textContent = 'パスワード設定に失敗しました';
+    errEl.style.display = 'block';
+  }
+}
+
+async function unlockDirectory() {
+  const pw = document.getElementById('pwInput').value.trim();
+  if (!pw) {
+    document.getElementById('pwError').textContent = 'パスワードを入力してください';
+    document.getElementById('pwError').style.display = 'block';
+    return;
+  }
+
+  try {
+    // Verify password against stored hash
+    const hash = await hashPasswordForVerification(pw, currentDirId);
+    const storedHash = getStoredPasswordHash(currentDirId);
+
+    if (storedHash && hash !== storedHash) {
+      document.getElementById('pwError').textContent = 'パスワードが正しくありません';
+      document.getElementById('pwError').style.display = 'block';
+      return;
+    }
+
+    // Store password in memory for this session
+    dirPasswords[currentDirId] = pw;
+
+    closePasswordModal();
+    enterDirectory(currentDirId, currentDirName);
+  } catch (e) {
+    console.error('Key derivation error:', e);
+    document.getElementById('pwError').textContent = 'キーの生成に失敗しました';
+    document.getElementById('pwError').style.display = 'block';
+  }
+}
+
+async function changeDirectoryPassword() {
+  const oldPw = document.getElementById('pwChangeOld').value.trim();
+  const newPw = document.getElementById('pwChangeNew').value.trim();
+  const confirmPw = document.getElementById('pwChangeConfirm').value.trim();
+  const errEl = document.getElementById('pwChangeError');
+
+  if (!oldPw || !newPw || !confirmPw) {
+    errEl.textContent = 'すべてのフィールドを入力してください';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (newPw.length < 4) {
+    errEl.textContent = '新しいパスワードは4文字以上で入力してください';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (newPw !== confirmPw) {
+    errEl.textContent = '新しいパスワードが一致しません';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    // Verify old password
+    const oldHash = await hashPasswordForVerification(oldPw, currentDirId);
+    const storedHash = getStoredPasswordHash(currentDirId);
+    if (storedHash && oldHash !== storedHash) {
+      errEl.textContent = '現在のパスワードが正しくありません';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    // Set new password
+    const newHash = await hashPasswordForVerification(newPw, currentDirId);
+    setStoredPasswordHash(currentDirId, newHash);
+    dirPasswords[currentDirId] = newPw;
+
+    closePasswordChangeModal();
+    alert('パスワードを変更しました。');
+  } catch (e) {
+    console.error('Password change error:', e);
+    errEl.textContent = 'パスワード変更に失敗しました';
+    errEl.style.display = 'block';
+  }
+}
+
+async function enterDirectory(dirId, dirName) {
+  currentDirId = dirId;
+  currentDirName = dirName;
+
+  // Update toolbar
+  document.getElementById('vaultBack').classList.add('show');
+  document.getElementById('vaultDirTitle').textContent = dirName;
+  document.getElementById('vaultDirTitle').classList.add('show');
+  document.getElementById('btnChangePw').classList.add('show');
+  document.getElementById('filterGroup').classList.add('show');
+  document.getElementById('vaultSearch').classList.add('show');
+  document.getElementById('viewToggle').classList.add('show');
+  document.getElementById('btnUpload').classList.add('show');
+
+  document.getElementById('dirGrid').style.display = 'none';
+  document.getElementById('fileGrid').style.display = 'grid';
+
+  const loader = document.getElementById('vaultLoader');
+  loader.style.display = 'flex';
+
+  try {
+    const { data, error } = await sb.from('files')
+      .select('*')
+      .eq('directory_id', dirId)
+      .eq('user_id', currentUser.id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    currentFiles = data || [];
+    filteredFiles = [...currentFiles];
+    currentFilter = 'all';
+    document.getElementById('vaultSearch').value = '';
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.filter-btn[data-filter="all"]').classList.add('active');
+    renderFiles();
+
+    // Start decrypting thumbnails in background
+    decryptThumbnails(currentFiles, dirId);
+  } catch (e) {
+    console.error('Load files error:', e);
+    document.getElementById('fileGrid').innerHTML = '<p style="color:var(--red);text-align:center;padding:40px;">ファイルの読み込みに失敗しました</p>';
+  } finally {
+    loader.style.display = 'none';
+  }
+}
+
+// Decrypt files for thumbnail display (runs in background)
+async function decryptThumbnails(files, dirId) {
+  const pw = dirPasswords[dirId];
+  if (!pw) return;
+
+  for (const file of files) {
+    if (decryptedBlobCache[file.id]) continue; // already cached
+    if (file.type !== 'photo' && file.type !== 'video') continue; // skip documents for now
+
+    try {
+      const { data, error } = await sb.storage.from('encrypted-files').download(file.storage_path);
+      if (error) throw error;
+
+      const encBuf = await data.arrayBuffer();
+      const salt = base64ToArray(file.salt);
+      const iv = base64ToArray(file.iv);
+      const key = await deriveKey(pw, salt);
+      const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encBuf);
+
+      const blob = new Blob([decrypted], { type: file.mime_type || 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      decryptedBlobCache[file.id] = url;
+
+      // Update the thumbnail in the grid
+      const thumbEl = document.getElementById('thumb-' + file.id);
+      if (thumbEl) {
+        if (file.type === 'photo') {
+          thumbEl.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;">`;
+        } else if (file.type === 'video') {
+          thumbEl.innerHTML = `<video src="${url}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>
+            <div class="play-overlay"><svg width="22" height="22" viewBox="0 0 24 24" fill="#333" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>`;
+        }
+      }
+    } catch (e) {
+      console.error('Thumbnail decrypt error for', file.name, e);
+    }
+  }
+}
+
+function backToDirectories() {
+  currentDirId = null;
+  currentDirName = '';
+  document.getElementById('vaultBack').classList.remove('show');
+  document.getElementById('vaultDirTitle').classList.remove('show');
+  document.getElementById('btnChangePw').classList.remove('show');
+  document.getElementById('filterGroup').classList.remove('show');
+  document.getElementById('vaultSearch').classList.remove('show');
+  document.getElementById('viewToggle').classList.remove('show');
+  document.getElementById('btnUpload').classList.remove('show');
+  document.getElementById('fileGrid').style.display = 'none';
+  document.getElementById('dirGrid').style.display = 'grid';
+  loadDirectories();
+}
+
+function renderFiles() {
+  const grid = document.getElementById('fileGrid');
+  grid.className = currentView === 'list' ? 'file-grid list-view' : 'file-grid';
+
+  if (filteredFiles.length === 0) {
+    grid.innerHTML = '<p style="text-align:center;color:#aaa;padding:60px 0;font-size:13px;grid-column:1/-1;">ファイルがありません</p>';
+    grid.style.display = 'grid';
+    return;
+  }
+
+  const gradients = [
+    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+    'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+    'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+  ];
+
+  grid.innerHTML = filteredFiles.map((f, i) => {
+    let thumbContent = '';
+    const cached = decryptedBlobCache[f.id];
+
+    if (f.type === 'photo') {
+      if (cached) {
+        thumbContent = `<div class="file-thumb photo" id="thumb-${f.id}" style="background:#000">
+          <img src="${cached}" style="width:100%;height:100%;object-fit:cover;">
+        </div>`;
+      } else {
+        const grad = gradients[i % gradients.length];
+        thumbContent = `<div class="file-thumb photo" id="thumb-${f.id}" style="background:${grad}">
+          <div class="thumb-loading"><div class="spinner-sm"></div></div>
+        </div>`;
+      }
+    } else if (f.type === 'video') {
+      if (cached) {
+        thumbContent = `<div class="file-thumb video" id="thumb-${f.id}" style="background:#000">
+          <video src="${cached}" style="width:100%;height:100%;object-fit:cover;" muted preload="metadata"></video>
+          <div class="play-overlay"><svg width="22" height="22" viewBox="0 0 24 24" fill="#333" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>
+        </div>`;
+      } else {
+        const grad = gradients[(i + 2) % gradients.length];
+        thumbContent = `<div class="file-thumb video" id="thumb-${f.id}" style="background:${grad}">
+          <div class="thumb-loading"><div class="spinner-sm"></div></div>
+          <div class="play-overlay"><svg width="22" height="22" viewBox="0 0 24 24" fill="#333" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>
+        </div>`;
+      }
+    } else {
+      thumbContent = `<div class="file-thumb document" id="thumb-${f.id}">
+        <div class="doc-icon">
+          <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+      </div>`;
+    }
+
+    return `<div class="file-card" onclick="openFileViewer(${i})">
+      ${thumbContent}
+      <div class="file-info">
+        <div class="fname" title="${escHTML(f.name)}">${escHTML(f.name)}</div>
+        <div class="fmeta">${formatBytes(f.size)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  grid.style.display = 'grid';
+}
+
+function filterFiles(type, btn) {
+  currentFilter = type;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+function searchFiles(query) {
+  applyFilters(query);
+}
+
+function applyFilters(query) {
+  const q = (query || document.getElementById('vaultSearch').value).toLowerCase().trim();
+  filteredFiles = currentFiles.filter(f => {
+    if (currentFilter !== 'all' && f.type !== currentFilter) return false;
+    if (q && !f.name.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  renderFiles();
+}
+
+function setView(view, btn) {
+  currentView = view;
+  document.querySelectorAll('.view-toggle button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFiles();
+}
+
+// ===== FILE UPLOAD =====
+function triggerUpload() {
+  document.getElementById('fileInput').click();
+}
+
+async function handleFileSelect(event) {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+
+  // Check free plan limit (total files across ALL folders)
+  if (profile.plan === 'free') {
+    try {
+      const { count, error } = await sb.from('files')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', currentUser.id);
+      if (!error && count >= 1) {
+        document.getElementById('upgradeModal').classList.add('open');
+        event.target.value = '';
+        return;
+      }
+    } catch (e) {
+      console.error('Free limit check error:', e);
+    }
+  }
+
+  for (const file of files) {
+    try {
+      await uploadFile(file);
+    } catch (e) {
+      console.error('Upload error:', e);
+      alert(`${file.name} のアップロードに失敗しました: ${e.message}`);
+    }
+  }
+
+  event.target.value = '';
+  // Refresh file list
+  await enterDirectory(currentDirId, currentDirName);
+  // Update profile storage
+  await loadProfile();
+}
+
+async function uploadFile(file) {
+  // Check storage limit
+  const newUsed = (profile.storage_used || 0) + file.size;
+  if (newUsed > profile.storage_limit) {
+    throw new Error('ストレージ容量が不足しています');
+  }
+
+  // Get the encryption password for this directory
+  const encryptionPassword = dirPasswords[currentDirId];
+  if (!encryptionPassword) {
+    throw new Error('暗号化パスワードが設定されていません');
+  }
+
+  // Read file
+  const arrayBuffer = await file.arrayBuffer();
+
+  // Generate salt and IV
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  // Derive key
+  const key = await deriveKey(encryptionPassword, salt);
+
+  // Encrypt
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, arrayBuffer);
+
+  // Prepare upload
+  const uuid = crypto.randomUUID();
+  const storagePath = `${currentUser.id}/${currentDirId}/${uuid}`;
+
+  // Upload to Supabase Storage
+  const encryptedBlob = new Blob([encrypted], { type: 'application/octet-stream' });
+  const { error: uploadError } = await sb.storage.from('encrypted-files').upload(storagePath, encryptedBlob);
+  if (uploadError) throw uploadError;
+
+  // Detect file type
+  const fileType = detectFileType(file);
+
+  // Insert file metadata
+  const { error: insertError } = await sb.from('files').insert({
+    directory_id: currentDirId,
+    user_id: currentUser.id,
+    name: file.name,
+    type: fileType,
+    size: file.size,
+    mime_type: file.type,
+    storage_path: storagePath,
+    iv: arrayToBase64(iv),
+    salt: arrayToBase64(salt)
+  });
+  if (insertError) throw insertError;
+
+  // Update storage used
+  const { error: updateError } = await sb.from('profiles')
+    .update({ storage_used: newUsed })
+    .eq('id', currentUser.id);
+  if (updateError) console.error('Storage update error:', updateError);
+
+  profile.storage_used = newUsed;
+}
+
+function detectFileType(file) {
+  if (file.type.startsWith('image/')) return 'photo';
+  if (file.type.startsWith('video/')) return 'video';
+  return 'document';
+}
+
+// ===== CRYPTO UTILS =====
+async function deriveKey(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits', 'deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+function arrayToBase64(arr) {
+  return btoa(String.fromCharCode(...arr));
+}
+
+function base64ToArray(b64) {
+  const binary = atob(b64);
+  const arr = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+  return arr;
+}
+
+// ===== FILE VIEWER =====
+function openFileViewer(index) {
+  viewerIndex = index;
+  renderViewer();
+  document.getElementById('fileViewer').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.documentElement.style.overflow = 'hidden';
+  window.scrollTo(0, 0);
+}
+
+function closeFileViewer() {
+  document.getElementById('fileViewer').classList.remove('open');
+  document.body.style.overflow = '';
+  document.documentElement.style.overflow = '';
+  document.body.style.width = '';
+  document.documentElement.style.width = '';
+  window.scrollTo(0, 0);
+}
+
+
+function viewerNav(dir) {
+  viewerIndex += dir;
+  if (viewerIndex < 0) viewerIndex = filteredFiles.length - 1;
+  if (viewerIndex >= filteredFiles.length) viewerIndex = 0;
+  renderViewer();
+}
+
+async function renderViewer() {
+  const file = filteredFiles[viewerIndex];
+  if (!file) return;
+  document.getElementById('fvName').textContent = file.name;
+  document.getElementById('fvMeta').textContent = `${formatBytes(file.size)} / ${file.mime_type || '不明'}`;
+
+  const content = document.getElementById('fvContent');
+
+  // Check if we have a cached decrypted version
+  const cached = decryptedBlobCache[file.id];
+  if (cached) {
+    if (file.type === 'photo') {
+      content.innerHTML = `<img src="${cached}" style="border-radius:8px;">`;
+    } else if (file.type === 'video') {
+      content.innerHTML = `<video src="${cached}" controls autoplay style="border-radius:8px;"></video>`;
+    } else {
+      content.innerHTML = `<div class="placeholder-img" style="background:#f5f7fa;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+        <svg width="72" height="72" viewBox="0 0 24 24" stroke="#2E75B6" fill="none" stroke-width="1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <div style="color:#666;font-size:13px;">${escHTML(file.name)}</div>
+        <div style="color:#999;font-size:11px;">ダウンロードして閲覧できます</div>
+      </div>`;
+    }
+    return;
+  }
+
+  // Show loading state while decrypting
+  content.innerHTML = `<div class="placeholder-img" style="background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+    <div class="spinner"></div>
+    <div style="color:rgba(255,255,255,.5);font-size:13px;">復号中...</div>
+  </div>`;
+
+  // Decrypt on the fly
+  try {
+    const pw = dirPasswords[currentDirId];
+    if (!pw) throw new Error('No password');
+
+    const { data, error } = await sb.storage.from('encrypted-files').download(file.storage_path);
+    if (error) throw error;
+
+    const encBuf = await data.arrayBuffer();
+    const salt = base64ToArray(file.salt);
+    const iv = base64ToArray(file.iv);
+    const key = await deriveKey(pw, salt);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encBuf);
+
+    const blob = new Blob([decrypted], { type: file.mime_type || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    decryptedBlobCache[file.id] = url;
+
+    // Only update if we're still viewing the same file
+    if (filteredFiles[viewerIndex]?.id === file.id) {
+      if (file.type === 'photo') {
+        content.innerHTML = `<img src="${url}" style="border-radius:8px;">`;
+      } else if (file.type === 'video') {
+        content.innerHTML = `<video src="${url}" controls autoplay style="border-radius:8px;"></video>`;
+      } else {
+        content.innerHTML = `<div class="placeholder-img" style="background:#f5f7fa;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+          <svg width="72" height="72" viewBox="0 0 24 24" stroke="#2E75B6" fill="none" stroke-width="1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <div style="color:#666;font-size:13px;">${escHTML(file.name)}</div>
+        </div>`;
+      }
+    }
+  } catch (e) {
+    console.error('Viewer decrypt error:', e);
+    content.innerHTML = `<div class="placeholder-img" style="background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+      <svg width="48" height="48" viewBox="0 0 24 24" stroke="var(--red)" fill="none" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      <div style="color:rgba(255,255,255,.6);font-size:13px;">復号に失敗しました</div>
+    </div>`;
+  }
+}
+
+async function downloadFile() {
+  const file = filteredFiles[viewerIndex];
+  const encryptionPassword = dirPasswords[currentDirId];
+  if (!file || !encryptionPassword) return;
+
+  try {
+    // Download encrypted file from storage
+    const { data, error } = await sb.storage.from('encrypted-files').download(file.storage_path);
+    if (error) throw error;
+
+    const encryptedBuffer = await data.arrayBuffer();
+    const salt = base64ToArray(file.salt);
+    const iv = base64ToArray(file.iv);
+
+    // Derive key and decrypt
+    const key = await deriveKey(encryptionPassword, salt);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encryptedBuffer);
+
+    // Create download
+    const blob = new Blob([decrypted], { type: file.mime_type || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error('Download error:', e);
+    alert('ファイルの復号に失敗しました。パスワードが正しいか確認してください。');
+  }
+}
+
+async function deleteFile() {
+  const file = filteredFiles[viewerIndex];
+  if (!file) return;
+  if (!confirm(`${file.name} を削除しますか？この操作は取り消せません。`)) return;
+
+  try {
+    // Delete from storage
+    const { error: storageError } = await sb.storage.from('encrypted-files').remove([file.storage_path]);
+    if (storageError) throw storageError;
+
+    // Delete from DB
+    const { error: dbError } = await sb.from('files').delete().eq('id', file.id);
+    if (dbError) throw dbError;
+
+    // Update storage used
+    const newUsed = Math.max(0, (profile.storage_used || 0) - file.size);
+    await sb.from('profiles').update({ storage_used: newUsed }).eq('id', currentUser.id);
+    profile.storage_used = newUsed;
+
+    closeFileViewer();
+    await enterDirectory(currentDirId, currentDirName);
+  } catch (e) {
+    console.error('Delete error:', e);
+    alert('ファイルの削除に失敗しました。');
+  }
+}
+
+function closeUpgradeModal() {
+  document.getElementById('upgradeModal').classList.remove('open');
+}
+
+// ===== TRIGGER SETTINGS =====
+async function loadTrigger() {
+  const loader = document.getElementById('triggerLoader');
+  const content = document.getElementById('triggerContent');
+  loader.style.display = 'flex';
+  content.style.display = 'none';
+
+  try {
+    const { data } = await sb.from('checkins')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .order('last_checkin', { ascending: false })
+      .limit(1);
+
+    checkinData = data?.[0] || null;
+    await loadProfile();
+
+    // Render status
+    const status = getCheckinStatus(checkinData);
+    const statusCls = status.cls || 'active';
+    document.getElementById('triggerStatus').innerHTML = `
+      <span class="status-badge ${statusCls}">${status.text}</span>
+      <span style="font-size:13px;color:#888;">${status.sub}</span>
+    `;
+
+    // Dates
+    if (checkinData) {
+      document.getElementById('triggerDates').innerHTML = `
+        <div class="td-item"><div class="td-label">最終チェックイン</div><div class="td-value">${formatDate(checkinData.last_checkin)}</div></div>
+        <div class="td-item"><div class="td-label">次の期限</div><div class="td-value">${formatDate(checkinData.next_deadline)}</div></div>
+      `;
+    } else {
+      document.getElementById('triggerDates').innerHTML = `
+        <div class="td-item"><div class="td-label">最終チェックイン</div><div class="td-value">未実施</div></div>
+        <div class="td-item"><div class="td-label">次の期限</div><div class="td-value">未設定</div></div>
+      `;
+    }
+
+    // Timeline
+    const stages = [
+      { day: 7, label: 'メール通知 #1' },
+      { day: 14, label: 'メール通知 #2' },
+      { day: 21, label: 'SMS通知' },
+      { day: 30, label: '最終確認' },
+      { day: 32, label: 'データ削除' }
+    ];
+    document.getElementById('timeline').innerHTML = stages.map((s, i) => {
+      let cls = '';
+      if (checkinData) {
+        const deadline = new Date(checkinData.next_deadline);
+        const now = new Date();
+        const overdueDays = Math.ceil((now - deadline) / (1000 * 60 * 60 * 24));
+        if (overdueDays >= s.day) cls = s.day >= 30 ? 'danger' : 'done';
+        else if (i === 0 && overdueDays > 0) cls = 'current';
+      }
+      return `<div class="tl-step ${cls}">
+        <div class="tl-dot">${i + 1}</div>
+        <div class="tl-day">Day ${s.day}</div>
+        <div class="tl-label">${s.label}</div>
+      </div>`;
+    }).join('');
+
+  } catch (e) {
+    console.error('Trigger load error:', e);
+  } finally {
+    loader.style.display = 'none';
+    content.style.display = 'block';
+  }
+}
+
+async function saveEmergencyContacts() {
+  const email = document.getElementById('emergEmail').value.trim();
+  const phone = document.getElementById('emergPhone').value.trim();
+  try {
+    const { error } = await sb.from('profiles')
+      .update({ emergency_email: email, emergency_phone: phone })
+      .eq('id', currentUser.id);
+    if (error) throw error;
+    profile.emergency_email = email;
+    profile.emergency_phone = phone;
+    alert('緊急連絡先を保存しました。');
+  } catch (e) {
+    console.error('Save emergency error:', e);
+    alert('保存に失敗しました。');
+  }
+}
+
+// ===== SETTINGS =====
+async function loadSettings() {
+  const loader = document.getElementById('settingsLoader');
+  const content = document.getElementById('settingsContent');
+  loader.style.display = 'flex';
+  content.style.display = 'none';
+
+  try {
+    await loadProfile();
+    document.getElementById('settingsName').value = profile.display_name || '';
+    document.getElementById('settingsEmail').value = currentUser.email;
+    const badge = document.getElementById('settingsPlan');
+    if (profile.plan === 'paid') {
+      badge.textContent = 'PAID';
+      badge.className = 'plan-badge paid';
+    } else {
+      badge.textContent = 'FREE';
+      badge.className = 'plan-badge free';
+    }
+
+    // Render emergency contacts form
+    document.getElementById('emergencyForm').innerHTML = `
+      <div class="form-group">
+        <label>緊急連絡先メール</label>
+        <input type="email" id="emergEmail" value="${escHTML(profile.emergency_email || '')}" placeholder="example@mail.com">
+      </div>
+      <div class="form-group">
+        <label>緊急連絡先電話番号</label>
+        <input type="tel" id="emergPhone" value="${escHTML(profile.emergency_phone || '')}" placeholder="090-xxxx-xxxx">
+      </div>
+    `;
+  } catch (e) {
+    console.error('Settings load error:', e);
+  } finally {
+    loader.style.display = 'none';
+    content.style.display = 'block';
+  }
+}
+
+async function saveProfile() {
+  const name = document.getElementById('settingsName').value.trim();
+  try {
+    const { error } = await sb.from('profiles')
+      .update({ display_name: name })
+      .eq('id', currentUser.id);
+    if (error) throw error;
+    profile.display_name = name;
+    updateUserUI();
+    alert('プロフィールを保存しました。');
+  } catch (e) {
+    console.error('Save profile error:', e);
+    alert('保存に失敗しました。');
+  }
+}
+
+async function changePassword() {
+  const newPw = prompt('新しいパスワードを入力してください（8文字以上）:');
+  if (!newPw || newPw.length < 8) {
+    if (newPw !== null) alert('パスワードは8文字以上で入力してください。');
+    return;
+  }
+  try {
+    const { error } = await sb.auth.updateUser({ password: newPw });
+    if (error) throw error;
+    alert('パスワードを変更しました。');
+  } catch (e) {
+    console.error('Password change error:', e);
+    alert('パスワード変更に失敗しました: ' + e.message);
+  }
+}
+
+async function logout() {
+  if (!confirm('ログアウトしますか？')) return;
+  try {
+    await sb.auth.signOut();
+  } catch (e) {
+    console.error('Logout error:', e);
+  }
+  // Clear all in-memory passwords
+  Object.keys(dirPasswords).forEach(k => delete dirPasswords[k]);
+  window.location.href = 'login.html';
+}
+
+// ===== UPGRADE =====
+async function loadUpgrade() {
+  const loader = document.getElementById('upgradeLoader');
+  const content = document.getElementById('upgradeContent');
+  loader.style.display = 'flex';
+  content.style.display = 'none';
+
+  try {
+    await loadProfile();
+
+    const hero = document.getElementById('upgradeHero');
+    if (profile.plan === 'free') {
+      hero.innerHTML = `
+        <div class="upgrade-hero">
+          <h2>フル機能をアンロック</h2>
+          <p>すべての機能と基本ストレージにアクセスできます</p>
+          <div class="price">9,800<span style="font-size:16px;font-weight:400;">円</span></div>
+          <div class="price-sub">買い切り（月額なし）</div>
+          <button onclick="startCheckout('price_1TNTjIA1dQClF1cORHOxc3RJ','one_time')">購入する</button>
+        </div>`;
+    } else {
+      hero.innerHTML = `
+        <div class="upgrade-hero" style="background:linear-gradient(135deg,var(--mint),#2ecc71);">
+          <h2>フルプランをご利用中</h2>
+          <p>すべての機能がアンロックされています</p>
+        </div>`;
+    }
+
+    const plans = [
+      { id: 'basic', name: 'Basic', size: '1GB', sizeBytes: 1073741824, price: '購入に含まれる', priceId: 'price_basic', included: true },
+      { id: 'standard', name: 'Standard', size: '5GB', sizeBytes: 5368709120, price: '+2,980円', priceId: 'price_standard', included: false },
+      { id: 'premium', name: 'Premium', size: '20GB', sizeBytes: 21474836480, price: '+5,980円', priceId: 'price_premium', included: false },
+      { id: 'unlimited', name: 'Unlimited', size: '50GB', sizeBytes: 53687091200, price: '+9,800円', priceId: 'price_unlimited', included: false }
+    ];
+
+    document.getElementById('plansGrid').innerHTML = plans.map(p => {
+      const isCurrent = profile.storage_limit === p.sizeBytes;
+      return `<div class="plan-card ${isCurrent ? 'current' : ''}">
+        <h4>${p.name}</h4>
+        <div class="plan-size">${p.size}</div>
+        <div class="plan-price">${p.price}</div>
+        <button ${isCurrent ? 'disabled' : ''} onclick="startCheckout('${p.priceId}','storage')">
+          ${isCurrent ? '現在のプラン' : '選択する'}
+        </button>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    console.error('Upgrade load error:', e);
+  } finally {
+    loader.style.display = 'none';
+    content.style.display = 'block';
+  }
+}
+
+async function startCheckout(priceId, type) {
+  try {
+    const session = await sb.auth.getSession();
+    if (!session.data.session) {
+      alert('ログインが必要です');
+      return;
+    }
+    const token = session.data.session.access_token;
+
+    // Show loading state
+    event && event.target && (event.target.disabled = true);
+    event && event.target && (event.target.textContent = '処理中...');
+
+    const res = await fetch(SUPABASE_URL + '/functions/v1/create-checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ price_id: priceId, type: type })
+    });
+
+    const data = await res.json();
+
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      throw new Error(data.error || '決済セッションの作成に失敗しました');
+    }
+  } catch (e) {
+    console.error('Checkout error:', e);
+    alert('決済の開始に失敗しました: ' + e.message);
+    // Reset button
+    if (event && event.target) {
+      event.target.disabled = false;
+      event.target.textContent = type === 'one_time' ? '購入する' : '選択する';
+    }
+  }
+}
+
+// ===== HELP =====
+function loadHelp() {
+  const faqs = [
+    { q: 'DIGILASTとは何ですか？', a: 'DIGILASTは、万が一の時にデジタルデータを安全に削除するためのサービスです。あなたのファイルは暗号化されてクラウドに保管され、一定期間チェックインがない場合に自動的に削除プロセスが開始されます。' },
+    { q: '暗号化はどのように行われますか？', a: 'すべてのファイルはアップロード前にブラウザ上でAES-256-GCM暗号化されます。暗号化パスワードはあなたのブラウザ内でのみ使用され、サーバーに送信されることはありません。PBKDF2-SHA256（10万回反復）でキーを導出します。' },
+    { q: 'チェックインとは何ですか？', a: 'チェックインは、あなたが健在であることを確認するための機能です。30日間チェックインがない場合、段階的なエスカレーションプロセスが始まり、最終的にデータが削除されます。' },
+    { q: '無料プランと有料プランの違いは？', a: '無料プランではファイル保管数に制限があります。有料プラン（9,800円の買い切り）ではすべての機能が利用可能になり、ストレージプランを追加購入できます。' },
+    { q: 'データが削除されるまでの流れは？', a: 'チェックイン期限超過後、Day 7とDay 14にメール通知、Day 21にSMS通知、Day 30に最終確認、Day 32にデータ完全削除が行われます。各ステップでチェックインすればプロセスは停止します。' }
+  ];
+
+  document.getElementById('faqList').innerHTML = faqs.map((faq, i) => `
+    <div class="faq-item" onclick="toggleFaq(this)">
+      <div class="faq-q">
+        <span>${faq.q}</span>
+        <span class="arrow">&#9660;</span>
+      </div>
+      <div class="faq-a">${faq.a}</div>
+    </div>
+  `).join('');
+}
+
+function toggleFaq(el) {
+  el.classList.toggle('open');
+}
+
+// ===== UTILS =====
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '不明';
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function escHTML(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('fileViewer').classList.contains('open')) {
+    if (e.key === 'Escape') closeFileViewer();
+    if (e.key === 'ArrowLeft') viewerNav(-1);
+    if (e.key === 'ArrowRight') viewerNav(1);
+  }
+  if (document.getElementById('passwordModal').classList.contains('open')) {
+    if (e.key === 'Escape') closePasswordModal();
+    if (e.key === 'Enter') unlockDirectory();
+  }
+  if (document.getElementById('passwordSetupModal').classList.contains('open')) {
+    if (e.key === 'Escape') closePasswordSetupModal();
+    if (e.key === 'Enter') setupDirectoryPassword();
+  }
+  if (document.getElementById('passwordChangeModal').classList.contains('open')) {
+    if (e.key === 'Escape') closePasswordChangeModal();
+    if (e.key === 'Enter') changeDirectoryPassword();
+  }
+});
+</script>
+</body>
+</html>
