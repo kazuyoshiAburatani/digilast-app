@@ -2184,7 +2184,8 @@ async function startCheckout(priceId, type) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
+        'Authorization': 'Bearer ' + token,
+        'apikey': SUPABASE_ANON_KEY
       },
       body: JSON.stringify({ price_id: priceId, type: type })
     });
