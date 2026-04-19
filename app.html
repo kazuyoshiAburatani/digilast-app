@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1B2A4A">
 <title>DIGILAST - デジタル遺品管理</title>
-<!-- v2.4 - 2026-04-19 -->
+<!-- v2.5 - 2026-04-19 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
@@ -18,11 +18,11 @@
   --mint: #27AE60;
   --red: #E74C3C;
   --light: #F0F4FA;
-  --bg: #F8FAFC;
+  --bg: #0E1829;
   --sidebar-w: 260px;
   --topbar-h: 56px;
   --radius: 10px;
-  --shadow: 0 2px 12px rgba(27,42,74,.08);
+  --shadow: 0 2px 12px rgba(0,0,0,.15);
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { overflow-x: hidden; width: 100%; }
@@ -31,7 +31,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
 /* ===== SIDEBAR ===== */
 .sidebar {
   position: fixed; top: 0; left: 0; bottom: 0;
-  width: var(--sidebar-w); background: var(--navy);
+  width: var(--sidebar-w); background: #fff;
   display: flex; flex-direction: column; z-index: 1000;
   transition: transform .3s cubic-bezier(.4,0,.2,1);
   transform: translateX(-100%);
@@ -41,20 +41,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
 }
 .sidebar-logo {
   height: var(--topbar-h); display: flex; align-items: center;
-  padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,.1);
+  padding: 0 18px; border-bottom: 1px solid #e2e8f0;
 }
-.sidebar-logo span { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: 2px; white-space: nowrap; overflow: hidden; }
+.sidebar-logo span { color: var(--navy); font-size: 20px; font-weight: 700; letter-spacing: 2px; white-space: nowrap; overflow: hidden; }
 .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 .nav-item {
   display: flex; align-items: center; gap: 12px;
-  padding: 11px 18px; color: rgba(255,255,255,.7); cursor: pointer;
+  padding: 11px 18px; color: #666; cursor: pointer;
   text-decoration: none; transition: all .15s; white-space: nowrap; font-size: 14px;
 }
-.nav-item:hover { background: rgba(255,255,255,.08); color: #fff; }
-.nav-item.active { background: rgba(46,117,182,.35); color: #fff; }
+.nav-item:hover { background: #f0f4fa; color: var(--navy); }
+.nav-item.active { background: rgba(46,117,182,.12); color: var(--accent); }
 .nav-item svg { flex-shrink: 0; width: 20px; height: 20px; }
 .nav-item span { overflow: hidden; }
-.nav-divider { height: 1px; background: rgba(255,255,255,.12); margin: 6px 18px; }
+.nav-divider { height: 1px; background: #e2e8f0; margin: 6px 18px; }
 
 /* ===== SIDEBAR OVERLAY ===== */
 .sidebar-overlay {
@@ -69,16 +69,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
 /* ===== TOPBAR ===== */
 .topbar {
   position: fixed; top: 0; left: 0; right: 0;
-  height: var(--topbar-h); background: #fff; border-bottom: 1px solid #e2e8f0;
+  height: var(--topbar-h); background: var(--navy); border-bottom: 1px solid rgba(255,255,255,.1);
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 16px; z-index: 90; overflow: hidden; max-width: 100%;
 }
 .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.topbar-left h2 { font-size: 16px; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-left h2 { font-size: 16px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hamburger-btn {
   display: flex; align-items: center; justify-content: center;
   width: 44px; height: 44px; border: none; border-radius: 8px;
-  background: var(--navy); cursor: pointer; flex-shrink: 0;
+  background: rgba(255,255,255,.15); cursor: pointer; flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
 }
 .hamburger-btn svg { width: 24px; height: 24px; }
@@ -547,7 +547,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
       <svg viewBox="0 0 24 24" stroke="#fff" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span>ヘルプ</span>
     </a>
-    <div style="margin-top:auto;padding:16px 20px;font-size:10px;color:rgba(255,255,255,.3);text-align:center;">v2.4</div>
+    <div style="margin-top:auto;padding:16px 20px;font-size:10px;color:rgba(255,255,255,.3);text-align:center;">v2.5</div>
   </nav>
 </aside>
 
@@ -557,7 +557,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
     <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="メニュー">
       <svg viewBox="0 0 24 24" stroke="#fff" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
-    <span style="font-size:9px;color:#bbb;background:#f0f4fa;padding:2px 6px;border-radius:4px;flex-shrink:0;">v2.4</span>
+    <span style="font-size:9px;color:#bbb;background:#f0f4fa;padding:2px 6px;border-radius:4px;flex-shrink:0;">v2.5</span>
     <h2 id="pageTitle">ホーム</h2>
   </div>
   <div class="topbar-right">
@@ -830,7 +830,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
     </div>
     <div class="contact-card" style="background:var(--light);border:1px solid #d0d5dd;">
       <h3>アプリ情報</h3>
-      <p style="font-size:13px;color:#666;">バージョン: <strong>v2.4</strong></p>
+      <p style="font-size:13px;color:#666;">バージョン: <strong>v2.5</strong></p>
       <p style="font-size:12px;color:#999;margin-top:4px;">最終更新: 2026年4月18日</p>
     </div>
     <div class="homescreen-card">
