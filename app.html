@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1B2A4A">
 <title>DIGILAST - デジタル遺品管理</title>
-<!-- v2.3 - 2026-04-18 -->
+<!-- v2.4 - 2026-04-19 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
@@ -592,6 +592,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
   <div class="modal">
     <h3 id="pwSetupTitle">パスワード設定</h3>
     <p id="pwSetupDesc">このフォルダの暗号化パスワードを設定してください。フォルダごとに異なるパスワードを使用できます。</p>
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+      <p style="font-size:12px;color:#856404;margin:0;font-weight:600;">⚠ 重要：パスワードの復元はできません</p>
+      <p style="font-size:11px;color:#856404;margin:4px 0 0;">ゼロ知識設計のため、パスワードはサーバーに保存されません。忘れるとファイルを復元できなくなります。安全な場所にメモしてください。</p>
+    </div>
     <div class="error-msg" id="pwSetupError">エラー</div>
     <input type="password" id="pwSetupInput" placeholder="パスワードを入力">
     <input type="password" id="pwSetupConfirm" placeholder="パスワードを再入力（確認）">
@@ -727,7 +731,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
         <h3>発動状態</h3>
         <div class="trigger-status" id="triggerStatus"></div>
         <div class="trigger-dates" id="triggerDates"></div>
-        <p style="font-size:13px;color:#888;">チェックイン間隔: <strong>30日</strong></p>
+        <p style="font-size:13px;color:#888;">チェックイン間隔: <strong id="triggerInterval">30日</strong></p>
       </div>
       <div class="trigger-card">
         <h3>エスカレーション タイムライン</h3>
@@ -765,6 +769,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
         <button class="btn-save" onclick="saveEmergencyContacts()">保存する</button>
       </div>
       <div class="settings-card">
+        <h3>チェックイン設定</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:16px;">チェックイン期限を設定します。期限を過ぎるとエスカレーションプロセスが開始されます。</p>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>チェックイン間隔</label>
+          <select id="checkinInterval" style="width:100%;padding:10px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;background:#fff;">
+            <option value="1">1日（デモ・テスト用）</option>
+            <option value="3">3日（デモ・テスト用）</option>
+            <option value="7">7日</option>
+            <option value="14">14日</option>
+            <option value="30" selected>30日（推奨）</option>
+            <option value="60">60日</option>
+            <option value="90">90日</option>
+          </select>
+        </div>
+        <p style="font-size:11px;color:#c0392b;margin-bottom:12px;">⚠ 短い間隔を設定すると、チェックインを忘れた場合に早期に削除プロセスが開始されます。テスト目的以外では30日以上を推奨します。</p>
+        <button class="btn-save" onclick="saveCheckinInterval()">保存する</button>
+      </div>
+      <div class="settings-card">
         <h3>セキュリティ</h3>
         <div class="settings-actions">
           <button class="btn-outline" onclick="changePassword()">パスワード変更</button>
@@ -789,8 +811,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
     <div class="faq-list" id="faqList"></div>
     <div class="contact-card">
       <h3>お問い合わせ</h3>
-      <p style="font-size:13px;color:#666;margin-bottom:8px;">ご質問やご要望がございましたら、お気軽にご連絡ください。</p>
-      <a href="mailto:support@digilast.jp">support@digilast.jp</a>
+      <p style="font-size:13px;color:#666;margin-bottom:12px;">ご質問やご要望がございましたら、お気軽にご連絡ください。営業日内に返信いたします。</p>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label style="font-size:12px;color:#888;">件名</label>
+        <select id="contactSubject" style="width:100%;padding:8px 10px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;">
+          <option value="使い方について">使い方について</option>
+          <option value="不具合の報告">不具合の報告</option>
+          <option value="料金・プランについて">料金・プランについて</option>
+          <option value="退会について">退会について</option>
+          <option value="その他">その他</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label style="font-size:12px;color:#888;">メッセージ</label>
+        <textarea id="contactMessage" rows="4" placeholder="お問い合わせ内容を入力してください" style="width:100%;padding:8px 10px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
+      </div>
+      <button class="btn-save" onclick="sendContactForm()">送信する</button>
     </div>
     <div class="contact-card" style="background:var(--light);border:1px solid #d0d5dd;">
       <h3>アプリ情報</h3>
@@ -886,6 +922,22 @@ const PAGE_TITLES = {
         navigateTo('upgrade');
       }, 500);
       window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    // Handle password reset redirect
+    if (window.location.hash === '#password-update') {
+      setTimeout(() => {
+        const newPw = prompt('新しいパスワードを入力してください（8文字以上）:');
+        if (newPw && newPw.length >= 8) {
+          sb.auth.updateUser({ password: newPw }).then(({ error }) => {
+            if (error) alert('パスワードの更新に失敗しました: ' + error.message);
+            else alert('パスワードが正常に更新されました。');
+          });
+        } else if (newPw) {
+          alert('パスワードは8文字以上にしてください。');
+        }
+        window.history.replaceState({}, '', window.location.pathname);
+      }, 500);
     }
   } catch (e) {
     console.error('Init error:', e);
@@ -1960,6 +2012,10 @@ async function loadTrigger() {
     checkinData = data?.[0] || null;
     await loadProfile();
 
+    // Update interval display
+    const interval = profile.checkin_interval || 30;
+    document.getElementById('triggerInterval').textContent = interval + '日';
+
     // Render status
     const status = getCheckinStatus(checkinData);
     const statusCls = status.cls || 'active';
@@ -2030,6 +2086,24 @@ async function saveEmergencyContacts() {
   }
 }
 
+async function saveCheckinInterval() {
+  const interval = parseInt(document.getElementById('checkinInterval').value);
+  if (interval <= 3) {
+    if (!confirm(`チェックイン間隔を${interval}日に設定します。\n\nこれはデモ・テスト用の短い設定です。\nチェックインを忘れると${interval}日後に削除プロセスが開始されます。\n\n本当に設定しますか？`)) return;
+  }
+  try {
+    const { error } = await sb.from('profiles')
+      .update({ checkin_interval: interval })
+      .eq('id', currentUser.id);
+    if (error) throw error;
+    profile.checkin_interval = interval;
+    alert(`チェックイン間隔を${interval}日に設定しました。`);
+  } catch (e) {
+    console.error('Save checkin interval error:', e);
+    alert('保存に失敗しました。');
+  }
+}
+
 // ===== SETTINGS =====
 async function loadSettings() {
   const loader = document.getElementById('settingsLoader');
@@ -2049,6 +2123,10 @@ async function loadSettings() {
       badge.textContent = 'FREE';
       badge.className = 'plan-badge free';
     }
+
+    // Set checkin interval
+    const interval = profile.checkin_interval || 30;
+    document.getElementById('checkinInterval').value = interval;
 
     // Render emergency contacts form
     document.getElementById('emergencyForm').innerHTML = `
@@ -2209,6 +2287,20 @@ async function startCheckout(priceId, type) {
 }
 
 // ===== HELP =====
+function sendContactForm() {
+  const subject = document.getElementById('contactSubject').value;
+  const message = document.getElementById('contactMessage').value.trim();
+  if (!message) {
+    alert('メッセージを入力してください。');
+    return;
+  }
+  const email = currentUser?.email || '';
+  const body = encodeURIComponent(`【${subject}】\n\nユーザー: ${email}\nプラン: ${profile?.plan || 'free'}\n\n${message}`);
+  window.location.href = `mailto:support@digilast.cloud?subject=${encodeURIComponent('DIGILAST: ' + subject)}&body=${body}`;
+  alert('メールアプリが開きます。送信してください。');
+  document.getElementById('contactMessage').value = '';
+}
+
 function loadHelp() {
   const faqs = [
     { q: 'DIGILASTとは何ですか？', a: 'DIGILASTは、万が一の時にデジタルデータを安全に削除するためのサービスです。あなたのファイルは暗号化されてクラウドに保管され、一定期間チェックインがない場合に自動的に削除プロセスが開始されます。' },

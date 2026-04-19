@@ -85,6 +85,19 @@ body{font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;backgroun
         <input type="password" id="login-password" placeholder="パスワード">
       </div>
       <button class="btn-primary" id="btn-login" onclick="handleLogin()">ログイン</button>
+      <p style="text-align:center;margin-top:12px"><a href="#" onclick="showResetForm();return false" style="font-size:13px;color:var(--accent);text-decoration:none">パスワードを忘れた方</a></p>
+    </div>
+
+    <!-- パスワードリセットフォーム -->
+    <div id="form-reset" style="display:none">
+      <h2 style="font-size:16px;color:var(--navy);margin-bottom:4px">パスワードのリセット</h2>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px">登録済みのメールアドレスにリセットリンクを送信します</p>
+      <div class="form-group">
+        <label>メールアドレス</label>
+        <input type="email" id="reset-email" placeholder="you@example.com">
+      </div>
+      <button class="btn-primary" id="btn-reset" onclick="handleReset()">リセットリンクを送信</button>
+      <p style="text-align:center;margin-top:12px"><a href="#" onclick="backToLogin();return false" style="font-size:13px;color:var(--accent);text-decoration:none">← ログインに戻る</a></p>
     </div>
 
     <!-- 新規登録フォーム -->
@@ -161,10 +174,18 @@ function hideMessages() {
   document.getElementById('success').style.display = 'none';
 }
 
-function setLoading(show) {
+function setLoading(show, returnTo) {
   document.getElementById('loading').style.display = show ? 'block' : 'none';
-  document.getElementById('form-login').style.display = show ? 'none' : (document.querySelector('.tab-btn.active').textContent.includes('ログイン') ? 'block' : 'none');
-  document.getElementById('form-signup').style.display = show ? 'none' : (document.querySelector('.tab-btn.active').textContent.includes('新規') ? 'block' : 'none');
+  if (show) {
+    document.getElementById('form-login').style.display = 'none';
+    document.getElementById('form-signup').style.display = 'none';
+    document.getElementById('form-reset').style.display = 'none';
+  } else if (returnTo === 'reset') {
+    document.getElementById('form-reset').style.display = 'block';
+  } else {
+    document.getElementById('form-login').style.display = document.querySelector('.tab-btn.active').textContent.includes('ログイン') ? 'block' : 'none';
+    document.getElementById('form-signup').style.display = document.querySelector('.tab-btn.active').textContent.includes('新規') ? 'block' : 'none';
+  }
 }
 
 // ===== ログイン =====
@@ -219,11 +240,47 @@ async function handleSignup() {
   }
 }
 
+// ===== パスワードリセット =====
+function showResetForm() {
+  hideMessages();
+  document.getElementById('form-login').style.display = 'none';
+  document.getElementById('form-signup').style.display = 'none';
+  document.getElementById('form-reset').style.display = 'block';
+  document.querySelector('.tabs').style.display = 'none';
+}
+
+function backToLogin() {
+  hideMessages();
+  document.getElementById('form-reset').style.display = 'none';
+  document.getElementById('form-login').style.display = 'block';
+  document.querySelector('.tabs').style.display = 'flex';
+}
+
+async function handleReset() {
+  hideMessages();
+  const email = document.getElementById('reset-email').value.trim();
+  if (!email) { showError('メールアドレスを入力してください'); return; }
+
+  setLoading(true, 'reset');
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/app.html#password-update'
+  });
+  setLoading(false, 'reset');
+
+  if (error) {
+    showError('送信に失敗しました: ' + error.message);
+    return;
+  }
+  showSuccess('パスワードリセットリンクを送信しました。メールをご確認ください。');
+}
+
 // Enterキー対応
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     const loginVisible = document.getElementById('form-login').style.display !== 'none';
-    if (loginVisible) handleLogin();
+    const resetVisible = document.getElementById('form-reset').style.display !== 'none';
+    if (resetVisible) handleReset();
+    else if (loginVisible) handleLogin();
     else handleSignup();
   }
 });
