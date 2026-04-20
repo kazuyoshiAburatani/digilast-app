@@ -1115,7 +1115,7 @@ function getCheckinStatus(data) {
   if (!data) return { text: '未設定', sub: 'チェックインを行ってください', cls: '' };
   const now = new Date();
   const deadline = new Date(data.next_deadline);
-  const diff = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+  const diff = Math.max(0, Math.ceil((deadline - now) / (1000 * 60 * 60 * 24)));
   if (diff > 14) return { text: '正常', sub: `残り ${diff} 日`, cls: '' };
   if (diff > 3) return { text: '注意', sub: `残り ${diff} 日`, cls: 'warning' };
   if (diff > 0) return { text: '警告', sub: `残り ${diff} 日`, cls: 'danger' };
@@ -2257,11 +2257,17 @@ async function saveCheckinInterval() {
       await sb.from('checkins').update({ next_deadline: newDeadline }).eq('id', checkinData.id);
       checkinData.next_deadline = newDeadline;
     }
+    profile.checkin_interval = interval;
+    if (checkinData && checkinData.id) {
+      const newDeadline = new Date(new Date(checkinData.last_checkin).getTime() + interval * 24 * 60 * 60 * 1000).toISOString();
+      const { error: e2 } = await sb.from('checkins').update({ next_deadline: newDeadline }).eq('id', checkinData.id);
+      if (!e2) checkinData.next_deadline = newDeadline;
+    }
     alert(`チェックイン間隔を${interval}日に設定しました。`);
-    loadTriggerSettings();
+    if (typeof loadTriggerSettings === 'function') loadTriggerSettings();
   } catch (e) {
     console.error('Save checkin interval error:', e);
-    alert('保存に失敗しました。');
+    alert('保存に失敗しました: ' + e.message);
   }
 }
 
