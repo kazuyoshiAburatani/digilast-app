@@ -2192,13 +2192,20 @@ async function loadTrigger() {
       `;
     }
 
-    // Timeline
-    const stages = [
+    // Timeline (interval-based)
+    const intv = interval;
+    const stages = intv <= 3 ? [
+      { day: Math.max(1, Math.round(intv * 0.25)), label: 'メール通知 #1' },
+      { day: Math.max(1, Math.round(intv * 0.5)), label: 'メール通知 #2' },
+      { day: Math.max(1, Math.round(intv * 0.75)), label: 'SMS通知' },
+      { day: intv, label: '最終確認' },
+      { day: intv + 1, label: 'データ削除' }
+    ] : [
       { day: 7, label: 'メール通知 #1' },
       { day: 14, label: 'メール通知 #2' },
       { day: 21, label: 'SMS通知' },
-      { day: 30, label: '最終確認' },
-      { day: 32, label: 'データ削除' }
+      { day: intv, label: '最終確認' },
+      { day: intv + 2, label: 'データ削除' }
     ];
     document.getElementById('timeline').innerHTML = stages.map((s, i) => {
       let cls = '';
