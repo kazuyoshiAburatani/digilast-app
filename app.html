@@ -2259,19 +2259,16 @@ async function saveCheckinInterval() {
       .eq('id', currentUser.id);
     if (error) throw error;
     profile.checkin_interval = interval;
-    if (checkinData) {
-      const newDeadline = new Date(new Date(checkinData.last_checkin).getTime() + interval * 24 * 60 * 60 * 1000).toISOString();
-      await sb.from('checkins').update({ next_deadline: newDeadline }).eq('id', checkinData.id);
-      checkinData.next_deadline = newDeadline;
-    }
-    profile.checkin_interval = interval;
+    // next_deadlineも再計算して更新
     if (checkinData && checkinData.id) {
       const newDeadline = new Date(new Date(checkinData.last_checkin).getTime() + interval * 24 * 60 * 60 * 1000).toISOString();
       const { error: e2 } = await sb.from('checkins').update({ next_deadline: newDeadline }).eq('id', checkinData.id);
       if (!e2) checkinData.next_deadline = newDeadline;
     }
     alert(`チェックイン間隔を${interval}日に設定しました。`);
-    if (typeof loadTriggerSettings === 'function') loadTriggerSettings();
+    // ダッシュボードとトリガーページを再描画
+    if (currentPage === 'dashboard') loadDashboard();
+    if (currentPage === 'trigger') loadTrigger();
   } catch (e) {
     console.error('Save checkin interval error:', e);
     alert('保存に失敗しました: ' + e.message);
