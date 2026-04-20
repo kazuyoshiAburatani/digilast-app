@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIGILAST - 削除体験デモ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--navy:#1B2A4A;--accent:#2E75B6;--gold:#D4A843;--mint:#27AE60;--red:#E74C3C;--light:#F0F4FA;--bg:#F8FAFC;--white:#FFF;--muted:#888;--border:#E2E8F0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:#333;min-height:100vh}
+
+.header{background:var(--navy);padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
+.header a{color:#fff;text-decoration:none;font-size:20px;font-weight:800;letter-spacing:2px}
+.header a span{color:var(--gold)}
+.header .badge{background:var(--gold);color:var(--navy);font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px}
+
+.container{max-width:640px;margin:0 auto;padding:24px 16px 60px}
+
+.hero{text-align:center;padding:32px 0 24px}
+.hero h1{font-size:22px;color:var(--navy);margin-bottom:8px}
+.hero p{font-size:14px;color:var(--muted);line-height:1.6}
+
+.steps{display:flex;gap:0;margin:24px 0;position:relative}
+.steps::before{content:'';position:absolute;top:18px;left:10%;right:10%;height:3px;background:var(--border);z-index:0}
+.step{flex:1;text-align:center;position:relative;z-index:1}
+.step-dot{width:36px;height:36px;border-radius:50%;background:var(--border);color:var(--muted);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;transition:.4s}
+.step.active .step-dot{background:var(--accent);color:#fff;box-shadow:0 0 0 4px rgba(46,117,182,.2)}
+.step.done .step-dot{background:var(--mint);color:#fff}
+.step.danger .step-dot{background:var(--red);color:#fff;animation:pulse 1s infinite}
+.step-label{font-size:11px;color:var(--muted);transition:.3s}
+.step.active .step-label,.step.done .step-label{color:var(--navy);font-weight:600}
+
+.demo-card{background:var(--white);border-radius:16px;padding:28px 24px;box-shadow:0 2px 16px rgba(0,0,0,.06);margin-bottom:20px;text-align:center}
+.demo-card h2{font-size:17px;color:var(--navy);margin-bottom:6px}
+.demo-card .sub{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.5}
+
+.file-list{text-align:left;margin:16px 0}
+.file-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--light);border-radius:8px;margin-bottom:6px;font-size:13px;transition:.4s}
+.file-row .f-icon{font-size:20px;flex-shrink:0}
+.file-row .f-info{flex:1;min-width:0}
+.file-row .f-name{font-weight:600;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-row .f-meta{font-size:11px;color:var(--muted)}
+.file-row .f-status{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;flex-shrink:0}
+.file-row .f-status.encrypted{background:#dbeafe;color:var(--accent)}
+.file-row .f-status.deleting{background:#fee2e2;color:var(--red);animation:pulse .8s infinite}
+.file-row .f-status.deleted{background:#d1fae5;color:var(--mint)}
+.file-row.deleted{opacity:.3;text-decoration:line-through}
+
+.folder-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:13px}
+.folder-row .f-icon{font-size:18px}
+.folder-row .f-name{font-weight:600;color:var(--navy);flex:1}
+.folder-row .f-count{font-size:11px;color:var(--muted)}
+
+.progress-area{display:none;margin:20px 0}
+.progress-label{font-size:13px;color:var(--navy);font-weight:600;margin-bottom:8px}
+.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;border-radius:4px;width:0%;transition:width .3s}
+.progress-fill.delete{background:linear-gradient(90deg,var(--red),#c0392b)}
+
+.notif-list{display:none;margin:16px 0;text-align:left}
+.notif-item{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--light);border-radius:8px;margin-bottom:8px;font-size:13px;opacity:0;transform:translateX(-20px);transition:.4s}
+.notif-item.show{opacity:1;transform:translateX(0)}
+.notif-item .notif-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.notif-item .notif-icon.mail{background:#dbeafe;color:var(--accent)}
+.notif-item .notif-icon.sms{background:#fef3c7;color:#d97706}
+.notif-item .notif-icon.warn{background:#fee2e2;color:var(--red)}
+.notif-item .notif-icon.del{background:var(--red);color:#fff}
+
+.countdown{display:none;margin:20px 0}
+.countdown-ring{width:120px;height:120px;margin:0 auto 12px;position:relative}
+.countdown-ring svg{width:120px;height:120px;transform:rotate(-90deg)}
+.countdown-ring circle{fill:none;stroke-width:6}
+.countdown-ring .bg{stroke:var(--border)}
+.countdown-ring .fg{stroke:var(--red);stroke-dasharray:339.292;stroke-dashoffset:0;transition:stroke-dashoffset 1s linear}
+.countdown-num{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:36px;font-weight:800;color:var(--red)}
+.countdown-text{font-size:13px;color:var(--muted)}
+
+.log{display:none;background:#1a1a2e;border-radius:10px;padding:14px;margin:16px 0;text-align:left;max-height:200px;overflow-y:auto;font-family:"SF Mono","Fira Code",monospace}
+.log-line{font-size:11px;line-height:1.8;opacity:0;transition:.3s}
+.log-line.show{opacity:1}
+.log-line .time{color:#666}
+.log-line .msg{color:#6ee7b7}
+.log-line .warn{color:#fbbf24}
+.log-line .err{color:#f87171}
+.log-line .info{color:#93c5fd}
+
+.result{display:none;padding:24px 0}
+.result-icon{font-size:56px;margin-bottom:12px}
+.result h3{font-size:18px;color:var(--navy);margin-bottom:8px}
+.result p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:16px}
+
+.btn-start{padding:16px 32px;background:linear-gradient(135deg,var(--red),#c0392b);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:.2s;display:inline-flex;align-items:center;gap:8px}
+.btn-start:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(231,76,60,.3)}
+.btn-start:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-back{padding:12px 24px;background:var(--white);color:var(--accent);border:2px solid var(--accent);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:.2s;text-decoration:none;display:inline-block;margin-top:12px}
+.btn-back:hover{background:var(--light)}
+
+.no-data{padding:40px 20px;text-align:center}
+.no-data h2{font-size:18px;color:var(--navy);margin-bottom:8px}
+.no-data p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:20px}
+.btn-upload-link{padding:12px 24px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-block}
+
+.warning-box{background:#FFF8E1;border-left:4px solid var(--red);padding:14px 16px;border-radius:0 8px 8px 0;margin:16px 0;text-align:left;font-size:13px;color:#333;line-height:1.6}
+.warning-box strong{color:var(--red)}
+
+.footer{text-align:center;padding:24px;font-size:12px;color:var(--muted)}
+.footer a{color:var(--accent);text-decoration:none}
+
+.loading-spinner{display:flex;align-items:center;justify-content:center;padding:40px;gap:10px;color:var(--muted);font-size:14px}
+.spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(231,76,60,.4)}50%{box-shadow:0 0 0 8px rgba(231,76,60,0)}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a href="app.html">DIGI<span>LAST</span></a>
+  <span class="badge">削除デモ</span>
+</div>
+
+<div class="container">
+  <div class="hero">
+    <h1>自動削除デモ</h1>
+    <p>登録済みのデータを使って、チェックイン未応答時の<br>「通知→自動削除」プロセスを実行します。</p>
+  </div>
+
+  <div class="steps" id="steps">
+    <div class="step active" id="step1"><div class="step-dot">1</div><div class="step-label">データ確認</div></div>
+    <div class="step" id="step2"><div class="step-dot">2</div><div class="step-label">通知</div></div>
+    <div class="step" id="step3"><div class="step-dot">3</div><div class="step-label">カウントダウン</div></div>
+    <div class="step" id="step4"><div class="step-dot">4</div><div class="step-label">完全削除</div></div>
+  </div>
+
+  <div class="demo-card" id="demoCard">
+    <div class="loading-spinner" id="loadingView">
+      <div class="spinner"></div>
+      データを読み込み中...
+    </div>
+
+    <div class="no-data" id="noDataView" style="display:none">
+      <h2>データがありません</h2>
+      <p>削除デモを実行するには、まず金庫にファイルをアップロードしてください。</p>
+      <a href="app.html" class="btn-upload-link">金庫に戻ってアップロード</a>
+    </div>
+
+    <div id="startView" style="display:none">
+      <h2>以下のデータをすべて削除します</h2>
+      <p class="sub">チェックイン未応答シナリオをシミュレーションし、最後に実際にデータを削除します。</p>
+
+      <div id="folderList"></div>
+      <div id="fileListPreview"></div>
+
+      <div class="warning-box">
+        <strong>⚠ 注意：これは本当の削除です。</strong><br>
+        デモ終了後、上記のファイルはすべてサーバーから完全に削除されます。復元はできません。
+      </div>
+
+      <button class="btn-start" id="btnStart" onclick="startDemo()">
+        <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        削除デモを開始する
+      </button>
+      <br>
+      <a href="app.html" class="btn-back">← 戻る</a>
+    </div>
+
+    <div class="file-list" id="fileListDemo" style="display:none"></div>
+
+    <div class="notif-list" id="notifList">
+      <div class="notif-item" id="notif1"><div class="notif-icon mail">📧</div><div>メール通知 #1 を送信（チェックイン未確認 — 7日経過）</div></div>
+      <div class="notif-item" id="notif2"><div class="notif-icon mail">📧</div><div>メール通知 #2 を送信（まだ応答なし — 14日経過）</div></div>
+      <div class="notif-item" id="notif3"><div class="notif-icon sms">📱</div><div>SMS通知を送信（緊急連絡先にも通知 — 21日経過）</div></div>
+      <div class="notif-item" id="notif4"><div class="notif-icon warn">⚠️</div><div>最終確認通知（48時間以内に応答なければ削除 — 30日経過）</div></div>
+      <div class="notif-item" id="notif5"><div class="notif-icon del">🗑️</div><div><strong>応答なし — データ完全削除を実行します</strong></div></div>
+    </div>
+
+    <div class="countdown" id="countdown">
+      <div class="countdown-ring">
+        <svg viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="54"/><circle class="fg" id="countdownCircle" cx="60" cy="60" r="54"/></svg>
+        <div class="countdown-num" id="countdownNum">5</div>
+      </div>
+      <div class="countdown-text">データ完全削除まで</div>
+    </div>
+
+    <div class="progress-area" id="progressArea">
+      <div class="progress-label" id="progressLabel">データ削除中...</div>
+      <div class="progress-bar"><div class="progress-fill delete" id="progressFill"></div></div>
+    </div>
+
+    <div class="log" id="log"></div>
+
+    <div class="result" id="result">
+      <div class="result-icon">✅</div>
+      <h3>すべてのデータが完全に削除されました</h3>
+      <p>これがDIGILASTの自動削除機能です。<br>チェックインに応答がなかった場合、段階的な通知の後、<br>すべてのデータが完全に削除されます。<br><br>暗号化パスワードなしでは復元は不可能です。</p>
+      <a href="app.html" class="btn-back" style="background:var(--accent);color:#fff;border-color:var(--accent)">アプリに戻る</a>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <a href="app.html">← アプリに戻る</a>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ejvaxazkfymntwnkkfym.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqdmF4YXprZnltbnR3bmtrZnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTU2OTAsImV4cCI6MjA5MjAzMTY5MH0.fEBrMLSBHCW4ax8Q8N1dmNPwTDSBHWnISXkRU74FpII';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let allDirs = [];
+let allFiles = [];
+let demoRunning = false;
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+
+function fileIcon(type) {
+  if (type === 'photo') return '🖼️';
+  if (type === 'video') return '🎬';
+  return '📄';
+}
+
+function addLog(msg, type = 'msg') {
+  const log = document.getElementById('log');
+  const time = new Date().toLocaleTimeString('ja-JP');
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="time">[${time}]</span> <span class="${type}">${msg}</span>`;
+  log.appendChild(line);
+  requestAnimationFrame(() => { line.classList.add('show'); log.scrollTop = log.scrollHeight; });
+}
+
+function setStep(n) {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('step' + i);
+    el.className = 'step';
+    if (i < n) el.classList.add('done');
+    else if (i === n) el.classList.add('active');
+    if (i === 4 && n === 4) el.classList.add('danger');
+  }
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'login.html'; return; }
+  currentUser = session.user;
+
+  const { data: dirs } = await sb.from('directories').select('*').eq('user_id', currentUser.id);
+  allDirs = dirs || [];
+
+  const { data: files } = await sb.from('files').select('*').eq('user_id', currentUser.id);
+  allFiles = files || [];
+
+  document.getElementById('loadingView').style.display = 'none';
+
+  if (allFiles.length === 0 && allDirs.length === 0) {
+    document.getElementById('noDataView').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('startView').style.display = 'block';
+
+  const folderHtml = allDirs.map(d => {
+    const count = allFiles.filter(f => f.directory_id === d.id).length;
+    return `<div class="folder-row"><span class="f-icon">📁</span><span class="f-name">${d.name}</span><span class="f-count">${count} ファイル</span></div>`;
+  }).join('');
+  document.getElementById('folderList').innerHTML = folderHtml;
+
+  const fileHtml = allFiles.map(f => {
+    return `<div class="file-row"><span class="f-icon">${fileIcon(f.type)}</span><div class="f-info"><div class="f-name">${f.name}</div><div class="f-meta">${formatBytes(f.size)} / ${f.mime_type || '不明'}</div></div><span class="f-status encrypted">暗号化済</span></div>`;
+  }).join('');
+  document.getElementById('fileListPreview').innerHTML = `<div class="file-list">${fileHtml}</div>`;
+})();
+
+async function startDemo() {
+  if (demoRunning) return;
+
+  if (!confirm(`本当に削除デモを開始しますか？\n\n${allFiles.length} 件のファイルと ${allDirs.length} 件のフォルダがすべて完全に削除されます。\nこの操作は取り消せません。`)) return;
+
+  demoRunning = true;
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('startView').style.display = 'none';
+
+  const log = document.getElementById('log');
+  log.style.display = 'block';
+  log.innerHTML = '';
+
+  const demoList = document.getElementById('fileListDemo');
+  demoList.style.display = 'block';
+  demoList.innerHTML = allFiles.map((f, i) => {
+    return `<div class="file-row" id="demoFile${i}"><span class="f-icon">${fileIcon(f.type)}</span><div class="f-info"><div class="f-name">${f.name}</div><div class="f-meta">${formatBytes(f.size)}</div></div><span class="f-status encrypted" id="demoStatus${i}">暗号化済</span></div>`;
+  }).join('');
+
+  setStep(1);
+  addLog(`対象データ: ${allFiles.length} ファイル / ${allDirs.length} フォルダ`, 'info');
+  addLog('すべてのファイルは AES-256-GCM で暗号化済み', 'info');
+  await sleep(1500);
+  addLog('', 'msg');
+  addLog('=== チェックイン期限切れシナリオ開始 ===', 'warn');
+  addLog('ユーザーがチェックイン期限内に応答しませんでした...', 'warn');
+  await sleep(1500);
+
+  setStep(2);
+  const notifList = document.getElementById('notifList');
+  notifList.style.display = 'block';
+
+  const notifs = [
+    { id: 'notif1', log: '📧 Day 7: メール通知 #1 送信', type: 'info' },
+    { id: 'notif2', log: '📧 Day 14: メール通知 #2 送信', type: 'info' },
+    { id: 'notif3', log: '📱 Day 21: SMS通知 送信（緊急連絡先にも通知）', type: 'warn' },
+    { id: 'notif4', log: '⚠️ Day 30: 最終確認通知 送信', type: 'warn' },
+    { id: 'notif5', log: '🚨 応答なし — 削除プロセス開始', type: 'err' },
+  ];
+
+  for (const n of notifs) {
+    await sleep(1200);
+    document.getElementById(n.id).classList.add('show');
+    addLog(n.log, n.type);
+  }
+  await sleep(1000);
+  notifList.style.display = 'none';
+
+  setStep(3);
+  const countdown = document.getElementById('countdown');
+  countdown.style.display = 'block';
+  addLog('', 'msg');
+  addLog('=== データ完全削除カウントダウン ===', 'err');
+
+  const circle = document.getElementById('countdownCircle');
+  const numEl = document.getElementById('countdownNum');
+  const circumference = 2 * Math.PI * 54;
+
+  for (let i = 5; i >= 0; i--) {
+    numEl.textContent = i;
+    circle.style.strokeDashoffset = circumference * (1 - i / 5);
+    if (i > 0) {
+      addLog(`削除まで ${i} 秒...`, 'err');
+      await sleep(1000);
+    }
+  }
+  countdown.style.display = 'none';
+
+  setStep(4);
+  const progressArea = document.getElementById('progressArea');
+  progressArea.style.display = 'block';
+
+  addLog('', 'msg');
+  addLog('=== データ完全削除を実行中 ===', 'err');
+
+  const totalItems = allFiles.length + allDirs.length;
+  let deleted = 0;
+
+  for (let i = 0; i < allFiles.length; i++) {
+    const f = allFiles[i];
+    const statusEl = document.getElementById('demoStatus' + i);
+    const rowEl = document.getElementById('demoFile' + i);
+
+    statusEl.textContent = '削除中...';
+    statusEl.className = 'f-status deleting';
+    addLog(`🗑️ 削除中: ${f.name}`, 'err');
+
+    try {
+      if (f.storage_path) {
+        await sb.storage.from('encrypted-files').remove([f.storage_path]);
+      }
+      await sb.from('files').delete().eq('id', f.id);
+    } catch (e) {
+      console.error('Delete file error:', e);
+    }
+
+    await sleep(400);
+    statusEl.textContent = '削除済';
+    statusEl.className = 'f-status deleted';
+    rowEl.classList.add('deleted');
+
+    deleted++;
+    const pct = Math.round((deleted / totalItems) * 100);
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = `データ削除中... (${deleted}/${totalItems})`;
+  }
+
+  for (const d of allDirs) {
+    addLog(`📁 フォルダ削除: ${d.name}`, 'err');
+    try {
+      await sb.from('directories').delete().eq('id', d.id);
+    } catch (e) {
+      console.error('Delete dir error:', e);
+    }
+    deleted++;
+    const pct = Math.round((deleted / totalItems) * 100);
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = `データ削除中... (${deleted}/${totalItems})`;
+    await sleep(300);
+  }
+
+  try {
+    await sb.from('profiles').update({ storage_used: 0 }).eq('id', currentUser.id);
+  } catch (e) {}
+
+  await sleep(500);
+  addLog('', 'msg');
+  addLog('✓ すべてのファイルが完全に削除されました', 'msg');
+  addLog('✓ ストレージからも完全に除去されました', 'msg');
+  addLog('✓ 暗号化パスワードなしでの復元は不可能です', 'msg');
+
+  await sleep(1000);
+  progressArea.style.display = 'none';
+  demoList.style.display = 'none';
+  log.style.display = 'none';
+  document.getElementById('result').style.display = 'block';
+
+  demoRunning = false;
+}
+</script>
+</body>
+</html>
