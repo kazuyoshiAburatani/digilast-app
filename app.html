@@ -1143,7 +1143,8 @@ async function performCheckin() {
 
   try {
     const now = new Date().toISOString();
-    const nextDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const interval = (profile && profile.checkin_interval) || 30;
+    const nextDeadline = new Date(Date.now() + interval * 24 * 60 * 60 * 1000).toISOString();
 
     if (checkinData) {
       const { error } = await sb.from('checkins')
@@ -2251,7 +2252,13 @@ async function saveCheckinInterval() {
       .eq('id', currentUser.id);
     if (error) throw error;
     profile.checkin_interval = interval;
+    if (checkinData) {
+      const newDeadline = new Date(new Date(checkinData.last_checkin).getTime() + interval * 24 * 60 * 60 * 1000).toISOString();
+      await sb.from('checkins').update({ next_deadline: newDeadline }).eq('id', checkinData.id);
+      checkinData.next_deadline = newDeadline;
+    }
     alert(`チェックイン間隔を${interval}日に設定しました。`);
+    loadTriggerSettings();
   } catch (e) {
     console.error('Save checkin interval error:', e);
     alert('保存に失敗しました。');
