@@ -2267,8 +2267,9 @@ async function saveCheckinInterval() {
     }
     alert(`チェックイン間隔を${interval}日に設定しました。`);
     // ダッシュボードとトリガーページを再描画
-    if (currentPage === 'dashboard') loadDashboard();
-    if (currentPage === 'trigger') loadTrigger();
+    const activePage = document.querySelector('.page.active');
+    if (activePage && activePage.id === 'page-dashboard') loadDashboard();
+    if (activePage && activePage.id === 'page-trigger') loadTrigger();
   } catch (e) {
     console.error('Save checkin interval error:', e);
     alert('保存に失敗しました: ' + e.message);
