@@ -783,8 +783,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
         <div class="form-group" style="margin-bottom:12px;">
           <label>チェックイン間隔</label>
           <select id="checkinInterval" style="width:100%;padding:10px 12px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;background:#fff;">
-            <option value="1">1日（デモ・テスト用）</option>
-            <option value="3">3日（デモ・テスト用）</option>
             <option value="7">7日</option>
             <option value="14">14日</option>
             <option value="30" selected>30日（推奨）</option>
@@ -792,8 +790,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragin
             <option value="90">90日</option>
           </select>
         </div>
-        <p style="font-size:11px;color:#c0392b;margin-bottom:12px;">⚠ 短い間隔を設定すると、チェックインを忘れた場合に早期に削除プロセスが開始されます。テスト目的以外では30日以上を推奨します。</p>
+        <p style="font-size:11px;color:#888;margin-bottom:12px;">チェックインを忘れると、設定した日数の経過後に段階的な通知が開始されます。</p>
         <button class="btn-save" onclick="saveCheckinInterval()">保存する</button>
+        <div id="demoBtnWrap" style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;display:none;">
+          <p style="font-size:13px;color:var(--navy);font-weight:600;margin-bottom:8px;">データ削除デモ</p>
+          <p style="font-size:12px;color:#888;margin-bottom:10px;">実際のデータを使って、削除プロセスを体験できます。</p>
+          <a href="demo.html" class="btn-save" style="display:block;text-align:center;text-decoration:none;background:var(--red);">削除デモを実行する</a>
+        </div>
       </div>
       <div class="settings-card">
         <h3>セキュリティ</h3>
@@ -2250,9 +2253,7 @@ async function saveEmergencyContacts() {
 
 async function saveCheckinInterval() {
   const interval = parseInt(document.getElementById('checkinInterval').value);
-  if (interval <= 3) {
-    if (!confirm(`チェックイン間隔を${interval}日に設定します。\n\nこれはデモ・テスト用の短い設定です。\nチェックインを忘れると${interval}日後に削除プロセスが開始されます。\n\n本当に設定しますか？`)) return;
-  }
+
   try {
     const { error } = await sb.from('profiles')
       .update({ checkin_interval: interval })
@@ -2278,6 +2279,11 @@ async function saveCheckinInterval() {
 
 // ===== SETTINGS =====
 async function loadSettings() {
+  // デモボタンの表示制御（無料ユーザーのみ表示）
+  const demoBtnWrap = document.getElementById('demoBtnWrap');
+  if (demoBtnWrap) {
+    demoBtnWrap.style.display = (profile && profile.plan === 'free') ? 'block' : 'none';
+  }
   const loader = document.getElementById('settingsLoader');
   const content = document.getElementById('settingsContent');
   loader.style.display = 'flex';
@@ -2378,6 +2384,7 @@ async function loadUpgrade() {
       hero.innerHTML = `
         <div class="upgrade-hero">
           <h2>フル機能をアンロック</h2>
+          <div style="font-size:22px;font-weight:700;margin:8px 0;letter-spacing:1px;">容量 1GB</div>
           <p>すべての機能と基本ストレージにアクセスできます</p>
           <div class="price">9,800<span style="font-size:16px;font-weight:400;">円</span></div>
           <div class="price-sub">買い切り（月額なし）</div>
@@ -2392,10 +2399,10 @@ async function loadUpgrade() {
     }
 
     const plans = [
-      { id: 'basic', name: 'Basic', size: '1GB', sizeBytes: 1073741824, price: '購入に含まれる', priceId: 'price_basic', included: true },
-      { id: 'standard', name: 'Standard', size: '5GB', sizeBytes: 5368709120, price: '+2,980円', priceId: 'price_standard', included: false },
-      { id: 'premium', name: 'Premium', size: '20GB', sizeBytes: 21474836480, price: '+5,980円', priceId: 'price_premium', included: false },
-      { id: 'unlimited', name: 'Unlimited', size: '50GB', sizeBytes: 53687091200, price: '+9,800円', priceId: 'price_unlimited', included: false }
+      { id: 'basic', name: 'Basic', size: '1GB', sizeBytes: 1073741824, price: '購入に含まれる', priceId: '', included: true },
+      { id: 'standard', name: 'Standard', size: '5GB', sizeBytes: 5368709120, price: '2,980円', priceId: 'price_1TORnsA1dQClF1cOhb0uuuUh', included: false },
+      { id: 'premium', name: 'Premium', size: '20GB', sizeBytes: 21474836480, price: '5,980円', priceId: 'price_1TORoCA1dQClF1cOWvdbUWzv', included: false },
+      { id: 'unlimited', name: 'Unlimited', size: '50GB', sizeBytes: 53687091200, price: '9,800円', priceId: 'price_1TORoUA1dQClF1cO9xEJZDJE', included: false }
     ];
 
     document.getElementById('plansGrid').innerHTML = plans.map(p => {
