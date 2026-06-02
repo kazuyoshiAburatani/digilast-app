@@ -2460,12 +2460,18 @@ async function loadUpgrade() {
 
     document.getElementById('plansGrid').innerHTML = plans.map(p => {
       const isCurrent = profile.storage_limit === p.sizeBytes;
-      return `<div class="plan-card ${isCurrent ? 'current' : ''}">
+      const isTooSmall = p.sizeBytes < (profile.storage_limit || 0);
+      const isDisabled = isCurrent || isTooSmall || p.included;
+      let btnLabel = '選択する';
+      if (isCurrent) btnLabel = '現在のプラン';
+      else if (isTooSmall) btnLabel = '現在より小さいプラン';
+      else if (p.included) btnLabel = '基本容量';
+      return `<div class="plan-card ${isCurrent ? 'current' : ''}" style="${isTooSmall ? 'opacity:.45;pointer-events:none;' : ''}">
         <h4>${p.name}</h4>
         <div class="plan-size">${p.size}</div>
         <div class="plan-price">${p.price}</div>
-        <button ${isCurrent ? 'disabled' : ''} onclick="startCheckout('${p.priceId}','storage')">
-          ${isCurrent ? '現在のプラン' : '選択する'}
+        <button ${isDisabled ? 'disabled' : ''} onclick="startCheckout('${p.priceId}','storage')">
+          ${btnLabel}
         </button>
       </div>`;
     }).join('');
