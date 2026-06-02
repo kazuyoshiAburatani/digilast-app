@@ -2436,15 +2436,18 @@ async function loadUpgrade() {
           <h2>フル機能をアンロック</h2>
           <div style="font-size:22px;font-weight:700;margin:8px 0;letter-spacing:1px;">容量 1GB</div>
           <p>すべての機能と基本ストレージにアクセスできます</p>
-          <div class="price">9,800<span style="font-size:16px;font-weight:400;">円</span></div>
-          <div class="price-sub">買い切り（月額なし）</div>
-          <button onclick="startCheckout('price_1TNTjIA1dQClF1cORHOxc3RJ','one_time')">購入する</button>
+          <div class="price">3,000<span style="font-size:16px;font-weight:400;">円/年</span></div>
+          <div class="price-sub">年額サブスクリプション（月額250円相当）</div>
+          <button onclick="startCheckout('price_1TdueDAVytMt92FiSyMfBL18','subscription')">サブスクリプションを開始</button>
         </div>`;
     } else {
       hero.innerHTML = `
         <div class="upgrade-hero" style="background:linear-gradient(135deg,var(--mint),#2ecc71);">
           <h2>フルプランをご利用中</h2>
           <p>すべての機能がアンロックされています</p>
+          <div style="margin-top:16px;">
+            <button onclick="manageSubscription()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);padding:8px 20px;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;">サブスクリプションを管理</button>
+          </div>
         </div>`;
     }
 
@@ -2471,6 +2474,32 @@ async function loadUpgrade() {
   } finally {
     loader.style.display = 'none';
     content.style.display = 'block';
+  }
+}
+
+async function manageSubscription() {
+  try {
+    const session = await sb.auth.getSession();
+    if (!session.data.session) { alert('ログインが必要です'); return; }
+
+    // Stripeカスタマーポータルへリダイレクト
+    const res = await fetch(SUPABASE_URL + '/functions/v1/customer-portal', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + session.data.session.access_token,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ origin: window.location.origin })
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert('ポータルの作成に失敗しました: ' + (data.error || '不明なエラー'));
+    }
+  } catch (e) {
+    alert('エラーが発生しました: ' + e.message);
   }
 }
 
